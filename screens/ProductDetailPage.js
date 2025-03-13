@@ -73,6 +73,7 @@ const ProductDetail = ({ route, navigation }) => {
         }
       }
 
+      
       // Update or insert
       if (existingItem) {
         const { error: updateError } = await supabase
