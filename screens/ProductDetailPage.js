@@ -20,6 +20,13 @@ const ProductDetail = ({ route, navigation }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedQuantity, setSelectedQuantity] = useState(1);
 
+  // Hard-coded comments data
+  const [comments] = useState([
+    { id: 1, user: 'User1', comment: 'Great product! Highly recommended.', date: '2023-10-01' },
+    { id: 2, user: 'User2', comment: 'Good quality, but delivery was slow.', date: '2023-10-05' },
+    { id: 3, user: 'User3', comment: 'Excellent value for money.', date: '2023-10-10' },
+  ]);
+
   const handleAddToCart = async () => {
     // Validation checks
     if (typeof selectedQuantity !== 'number' || selectedQuantity < 1) {
@@ -156,6 +163,18 @@ const ProductDetail = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Comments Section */}
+      <View style={styles.commentsSection}>
+        <Text style={styles.sectionTitle}>Comments</Text>
+        {comments.map((comment) => (
+          <View key={comment.id} style={styles.commentItem}>
+            <Text style={styles.commentUser}>{comment.user}</Text>
+            <Text style={styles.commentText}>{comment.comment}</Text>
+            <Text style={styles.commentDate}>{comment.date}</Text>
+          </View>
+        ))}
+      </View>
+
       {/* Quantity Selection Modal */}
       <Modal
         animationType="slide"
@@ -196,7 +215,6 @@ const ProductDetail = ({ route, navigation }) => {
     </ScrollView>
   );
 };
-
 
 const styles = StyleSheet.create({
   container: {
@@ -309,6 +327,29 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     paddingVertical: 10,
     paddingHorizontal: 20,
+  },
+  commentsSection: {
+    padding: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  commentItem: {
+    marginBottom: 15,
+  },
+  commentUser: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  commentText: {
+    fontSize: 14,
+    color: '#666',
+    marginTop: 5,
+  },
+  commentDate: {
+    fontSize: 12,
+    color: '#888',
+    marginTop: 5,
   },
 });
 
