@@ -1,3 +1,4 @@
+// screens/ShoppingCart.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
@@ -5,9 +6,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // Supabase configuration
-const supabaseUrl = 'https://zppoywoaiktzsinnxcco.supabase.co';
+const supabaseUrl = 'https://ebvecgyezvakcxlegspv.supabase.co';
 const supabaseAnonKey =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpwcG95d29haWt0enNpbm54Y2NvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjgyMjc2MTYsImV4cCI6MjA0MzgwMzYxNn0.SEYkSE1oJ3YL9ReDQCG48tCvI0Aur-3NgfPmGr0zIRg';
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVidmVjZ3llenZha2N4bGVnc3B2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzk5NjQxMzgsImV4cCI6MjA1NTU0MDEzOH0.0-SY6Q80nuVeg4_Cqi76V7P2eWvYBOrv8q0WUp4eo_0';
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const ShoppingCart = ({ navigation }) => {
@@ -38,51 +39,54 @@ const ShoppingCart = ({ navigation }) => {
         .select('user_id')
         .eq('email', email)
         .single();
-  
+
       if (userError || !userData) {
         console.error('Error fetching user:', userError?.message || 'User not found');
+        Alert.alert('错误', '用户未找到，请检查登录状态');
+        setCartItems([]);
         return;
       }
-  
-      // Fetch shopping cart items
+
       const { data: cartData, error: cartError } = await supabase
         .from('shopping_cart')
         .select('id, product_id, quantity')
         .eq('user_id', userData.user_id);
-  
-      if (cartError) throw cartError;
-  
+
+      if (cartError) {
+        throw cartError;
+      }
+
       if (!cartData?.length) {
         setCartItems([]);
+        setTotal(0);
         return;
       }
-  
-      // Extract product IDs
-      const productIds = cartData.map(item => item.product_id);
-  
-      // Fetch related products
+
+      const productIds = cartData.map((item) => item.product_id);
       const { data: productsData, error: productsError } = await supabase
         .from('products')
         .select('*')
         .in('product_id', productIds);
-  
-      if (productsError) throw productsError;
-  
-      // Merge data
-      const mergedData = cartData.map(cartItem => ({
+
+      if (productsError) {
+        throw productsError;
+      }
+
+      const mergedData = cartData.map((cartItem) => ({
         cartId: cartItem.id,
-        ...productsData.find(p => p.product_id === cartItem.product_id),
-        quantity: cartItem.quantity
+        ...productsData.find((p) => p.product_id === cartItem.product_id),
+        quantity: cartItem.quantity,
       }));
-  
+
       setCartItems(mergedData);
       calculateTotal(mergedData);
     } catch (error) {
-      console.error('Error fetching cart items:', error);
+      console.error('Error fetching cart items:', error.message || error);
       Alert.alert('错误', '无法获取购物车数据');
+      setCartItems([]);
+      setTotal(0);
     }
   };
-
 
   const calculateTotal = (items) => {
     const total = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
@@ -104,8 +108,20 @@ const ShoppingCart = ({ navigation }) => {
   };
 
   const handleCheckout = async () => {
-    Alert.alert('结算', `总金额：$${total}`);
-    // Add checkout logic here
+    try {
+      if (cartItems.length === 0) {
+        Alert.alert('错误', '购物车为空，无法结算');
+        return;
+      }
+
+      navigation.navigate('CheckoutConfirmation', {
+        cartItems,
+        total,
+      });
+    } catch (error) {
+      console.error('Error during checkout:', error);
+      Alert.alert('错误', '结算过程中发生错误');
+    }
   };
 
   const renderItem = ({ item }) => (

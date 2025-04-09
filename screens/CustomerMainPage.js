@@ -1,3 +1,4 @@
+// screens/MainPage.js
 import React, { useEffect, useState } from 'react';
 import {
   View,
@@ -13,6 +14,7 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabaseClient';
+import CustBar from './CustBar'; // Import the new CustBar component
 
 const { width } = Dimensions.get('window'); // 获取屏幕宽度，用于判断设备类型
 
@@ -157,7 +159,7 @@ const MainPage = ({ navigation }) => {
         ))}
       </View>
 
-      <View style={{ flex: 1 }}>
+      <View style={styles.contentContainer}>
         <FlatList
           data={filteredProducts}
           renderItem={renderProductItem}
@@ -167,6 +169,8 @@ const MainPage = ({ navigation }) => {
           contentContainerStyle={styles.productGrid}
         />
       </View>
+
+      <CustBar navigation={navigation} activeScreen="HomePage" />
     </View>
   );
 };
@@ -252,6 +256,10 @@ const styles = StyleSheet.create({
   },
   categoryText: {
     fontSize: 12,
+  },
+  contentContainer: {
+    flex: 1,
+    marginBottom: 60, // Leave space for the bottom bar
   },
   productGrid: {
     padding: 8,
