@@ -111,7 +111,7 @@ const MainPage = ({ navigation }) => {
           <Icon name="search" size={16} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search for anything..."
+            placeholder=""
             value={searchQuery}
             onChangeText={setSearchQuery}
           />

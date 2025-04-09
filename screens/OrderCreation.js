@@ -15,6 +15,13 @@ const OrderCreation = ({ navigation, route }) => {
   const [orderDetails, setOrderDetails] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // Hide the navigation header
+  useEffect(() => {
+    navigation.setOptions({
+      headerShown: false,
+    });
+  }, [navigation]);
+
   useEffect(() => {
     const createOrder = async () => {
       try {
@@ -198,14 +205,8 @@ const OrderCreation = ({ navigation, route }) => {
 
       <View style={styles.buttonContainer}>
         <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()} // Go back to previous screen
-        >
-          <Text style={styles.buttonText}>返回</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
           style={styles.homeButton}
-          onPress={() => navigation.navigate('HomePage')} // Go to HomePage
+          onPress={() => navigation.navigate('HomePage')}
         >
           <Text style={styles.buttonText}>返回首页</Text>
         </TouchableOpacity>
@@ -317,15 +318,9 @@ const styles = StyleSheet.create({
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center', // Center the single button
     marginTop: 20,
     paddingBottom: 16,
-  },
-  backButton: {
-    backgroundColor: '#ccc',
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    borderRadius: 8,
   },
   homeButton: {
     backgroundColor: '#2CB696',
