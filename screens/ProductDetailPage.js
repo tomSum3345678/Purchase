@@ -159,7 +159,7 @@ const ProductDetail = ({ route, navigation }) => {
           onPress={() => setModalVisible(true)}
         >
           <Icon name="shopping-cart" size={20} color="white" />
-          <Text style={styles.buttonText}>Add</Text>
+          <Text style={styles.buttonText}>加入購物車</Text>
         </TouchableOpacity>
       </View>
 
