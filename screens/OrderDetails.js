@@ -1,9 +1,15 @@
-// screens/OrderDetails.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import {
+  FlatList,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Alert,
+  View,
+  Image, // Added Image component
+} from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 
 // Supabase configuration
 const supabaseUrl = 'https://ebvecgyezvakcxlegspv.supabase.co';
@@ -41,22 +47,21 @@ const OrderDetails = ({ navigation, route }) => {
         }
         const userId = userData.user_id;
 
-        // Fetch order data
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
           .select('*')
           .eq('order_id', orderId)
-          .eq('user_id', userId) // Ensure the order belongs to the user
+          .eq('user_id', userId)
           .single();
 
         if (orderError || !orderData) {
           throw new Error(orderError?.message || 'Order not found');
         }
 
-        // Fetch order items with product names
+        // Fetch order items with product details including image_data
         const { data: itemsData, error: itemsError } = await supabase
           .from('order_items')
-          .select('product_id, quantity, price, products(product_name)')
+          .select('product_id, quantity, price, products(product_name, image_data)') // Added image_data
           .eq('order_id', orderId);
 
         if (itemsError) throw itemsError;
@@ -66,6 +71,7 @@ const OrderDetails = ({ navigation, route }) => {
           product_name: item.products.product_name,
           quantity: item.quantity,
           price: item.price,
+          image_data: item.products.image_data, // Added image_data
         }));
 
         setOrderDetails({
@@ -75,14 +81,15 @@ const OrderDetails = ({ navigation, route }) => {
           address: {
             line1: orderData.delivery_address_line1,
             line2: orderData.delivery_address_line2,
-            city: orderData.delivery_city,
-            state: orderData.delivery_state,
-            postalCode: orderData.delivery_postal_code,
+            district: orderData.delivery_district,
+            street: orderData.delivery_street,
             country: orderData.delivery_country,
           },
           paymentMethod: orderData.payment_method || '未指定',
           orderDate: new Date(orderData.order_date).toLocaleString(),
           paymentStatus: orderData.payment_status,
+          status: orderData.status,
+          deliveryStatus: orderData.delivery_status_current_location,
         });
         setLoading(false);
       } catch (error) {
@@ -97,10 +104,19 @@ const OrderDetails = ({ navigation, route }) => {
 
   const renderItem = ({ item }) => (
     <View style={styles.itemCard}>
-      <Text style={styles.itemName}>{item.product_name}</Text>
-      <Text style={styles.itemDetail}>数量: {item.quantity}</Text>
-      <Text style={styles.itemDetail}>单价: ${item.price}</Text>
-      <Text style={styles.itemSubtotal}>小计: ${(item.price * item.quantity).toFixed(2)}</Text>
+      {/* Added Image component */}
+      <Image
+        source={{ uri: item.image_data }}
+        style={styles.itemImage}
+        resizeMode="cover"
+        onError={() => console.log(`Failed to load image for ${item.product_name}`)}
+      />
+      <View style={styles.itemTextContainer}>
+        <Text style={styles.itemName}>{item.product_name}</Text>
+        <Text style={styles.itemDetail}>数量: {item.quantity}</Text>
+        <Text style={styles.itemDetail}>单价: ${item.price}</Text>
+        <Text style={styles.itemSubtotal}>小计: ${(item.price * item.quantity).toFixed(2)}</Text>
+      </View>
     </View>
   );
 
@@ -115,59 +131,69 @@ const OrderDetails = ({ navigation, route }) => {
   if (!orderDetails) return null;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>订单详情</Text>
-        <Text style={styles.orderId}>订单编号: #{orderDetails.orderId}</Text>
-      </View>
+    <FlatList
+      data={orderDetails.cartItems}
+      renderItem={renderItem}
+      keyExtractor={(item) => item.product_id.toString()}
+      ListHeaderComponent={
+        <View style={styles.contentContainer}>
+          <View style={styles.header}>
+            <Text style={styles.headerTitle}>订单详情</Text>
+            <Text style={styles.orderId}>订单编号: #{orderDetails.orderId}</Text>
+          </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>订购商品</Text>
-        <FlatList
-          data={orderDetails.cartItems}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.product_id.toString()}
-          contentContainerStyle={styles.list}
-        />
-        <Text style={styles.total}>总金额: ${orderDetails.total}</Text>
-      </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>送货地址</Text>
+            <Text style={styles.addressText}>{orderDetails.address.line1}</Text>
+            {orderDetails.address.line2 && (
+              <Text style={styles.addressText}>{orderDetails.address.line2}</Text>
+            )}
+            <Text style={styles.addressText}>
+              {orderDetails.address.street}, {orderDetails.address.district}
+            </Text>
+            <Text style={styles.addressText}>{orderDetails.address.country}</Text>
+          </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>送货地址</Text>
-        <Text style={styles.addressText}>{orderDetails.address.line1}</Text>
-        {orderDetails.address.line2 && (
-          <Text style={styles.addressText}>{orderDetails.address.line2}</Text>
-        )}
-        <Text style={styles.addressText}>
-          {orderDetails.address.city}, {orderDetails.address.state}, {orderDetails.address.postalCode}
-        </Text>
-        <Text style={styles.addressText}>{orderDetails.address.country}</Text>
-      </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>付款方式</Text>
+            <Text style={styles.detailText}>{orderDetails.paymentMethod}</Text>
+          </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>付款方式</Text>
-        <Text style={styles.detailText}>{orderDetails.paymentMethod}</Text>
-      </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>付款状态</Text>
+            <Text style={styles.detailText}>
+              {orderDetails.paymentStatus === null ? '未付款' : orderDetails.paymentStatus}
+            </Text>
+          </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>付款状态</Text>
-        <Text style={styles.detailText}>
-          {orderDetails.paymentStatus === null ? '未付款' : orderDetails.paymentStatus}
-        </Text>
-      </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>订单状态</Text>
+            <Text style={styles.detailText}>{orderDetails.status}</Text>
+          </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>订单日期</Text>
-        <Text style={styles.detailText}>{orderDetails.orderDate}</Text>
-      </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>配送状态</Text>
+            <Text style={styles.detailText}>
+              {orderDetails.deliveryStatus === null ? '未发货' : orderDetails.deliveryStatus}
+            </Text>
+          </View>
 
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <Text style={styles.buttonText}>返回</Text>
-      </TouchableOpacity>
-    </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>订单日期</Text>
+            <Text style={styles.detailText}>{orderDetails.orderDate}</Text>
+          </View>
+        </View>
+      }
+      ListFooterComponent={
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.buttonText}>返回</Text>
+        </TouchableOpacity>
+      }
+      contentContainerStyle={{ paddingBottom: 20 }}
+    />
   );
 };
 
@@ -175,7 +201,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  contentContainer: {
     padding: 16,
+    paddingBottom: 20,
   },
   loadingContainer: {
     flex: 1,
@@ -216,13 +245,21 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
   },
-  list: {
-    paddingBottom: 8,
-  },
   itemCard: {
+    flexDirection: 'row', // Align image and text horizontally
     padding: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    alignItems: 'center',
+  },
+  itemImage: {
+    width: 60, // Adjust size as needed
+    height: 60,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  itemTextContainer: {
+    flex: 1,
   },
   itemName: {
     fontSize: 16,
@@ -238,13 +275,6 @@ const styles = StyleSheet.create({
     color: '#2CB696',
     fontWeight: '500',
     marginTop: 4,
-  },
-  total: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'right',
-    marginTop: 8,
   },
   addressText: {
     fontSize: 14,

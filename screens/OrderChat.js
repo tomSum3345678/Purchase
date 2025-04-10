@@ -1,6 +1,6 @@
 // screens/OrderChat.js
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert } from 'react-native';
+import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -11,20 +11,16 @@ const supabaseAnonKey =
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 const OrderChat = ({ navigation, route }) => {
-  const [order, setOrder] = useState(null);
-  const [message, setMessage] = useState('');
-  const [userRole, setUserRole] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const { orderId } = route.params;
 
-  // Fetch initial order data
   useEffect(() => {
-    const fetchOrder = async () => {
+    const fetchUserAndMessages = async () => {
       try {
-        const { orderId } = route.params || {};
-        if (!orderId) {
-          throw new Error('Missing order ID');
-        }
-
         const email = await AsyncStorage.getItem('isLoggedIn');
         if (!email) {
           Alert.alert('错误', '请先登录');
@@ -42,80 +38,56 @@ const OrderChat = ({ navigation, route }) => {
           throw new Error(userError?.message || 'User not found');
         }
 
-        const userId = userData.user_id;
+        setUserId(userData.user_id);
         setUserRole(userData.role);
 
-        const { data: orderData, error: orderError } = await supabase
-          .from('orders')
-          .select('*')
+        // Fetch messages
+        const { data: messagesData, error: messagesError } = await supabase
+          .from('order_messages')
+          .select('message_id, user_id, message_text, sent_at, is_sales')
           .eq('order_id', orderId)
-          .single();
+          .order('sent_at', { ascending: true });
 
-        if (orderError || !orderData) {
-          throw new Error(orderError?.message || 'Order not found');
-        }
+        if (messagesError) throw messagesError;
 
-        // For customers, ensure the order belongs to them
-        if (userData.role !== 'admin' && orderData.user_id !== userId) {
-          throw new Error('Unauthorized access to this order');
-        }
-
-        setOrder(orderData);
+        setMessages(messagesData || []);
         setLoading(false);
+
+        // Subscribe to real-time updates
+        const subscription = supabase
+          .channel(`order_messages:order_id=${orderId}`)
+          .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'order_messages', filter: `order_id=eq.${orderId}` }, (payload) => {
+            setMessages((prev) => [...prev, payload.new]);
+          })
+          .subscribe();
+
+        return () => supabase.removeChannel(subscription);
       } catch (error) {
-        console.error('Error fetching order:', error.message || error);
-        Alert.alert('错误', '无法加载聊天室');
-        navigation.goBack();
+        console.error('Error fetching chat data:', error.message || error);
+        Alert.alert('错误', '无法加载聊天记录');
+        setLoading(false);
       }
     };
 
-    fetchOrder();
-  }, [navigation, route]);
-
-  // Real-time subscription for order updates
-  useEffect(() => {
-    if (!order) return; // Wait until order is loaded
-
-    const subscription = supabase
-      .channel('orders')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `order_id=eq.${order.order_id}`,
-        },
-        (payload) => {
-          setOrder(payload.new); // Update order state with the new data
-        }
-      )
-      .subscribe();
-
-    // Cleanup subscription on unmount
-    return () => {
-      supabase.removeChannel(subscription);
-    };
-  }, [order]);
+    fetchUserAndMessages();
+  }, [navigation, orderId]);
 
   const sendMessage = async () => {
-    if (!message.trim()) {
-      Alert.alert('错误', '消息不能为空');
-      return;
-    }
+    if (!newMessage.trim()) return;
 
     try {
-      const updateField = userRole === 'admin' ? 'sales_message' : 'cust_message';
       const { error } = await supabase
-        .from('orders')
-        .update({ [updateField]: message })
-        .eq('order_id', order.order_id);
+        .from('order_messages')
+        .insert({
+          order_id: orderId,
+          user_id: userId,
+          message_text: newMessage.trim(),
+          is_sales: userRole === 'admin',
+        });
 
       if (error) throw error;
 
-      setOrder((prev) => ({ ...prev, [updateField]: message }));
-      setMessage('');
-      Alert.alert('成功', '消息已发送');
+      setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error.message || error);
       Alert.alert('错误', '发送消息失败');
@@ -123,14 +95,9 @@ const OrderChat = ({ navigation, route }) => {
   };
 
   const renderMessage = ({ item }) => (
-    <View
-      style={[
-        styles.messageBubble,
-        item.sender === 'customer' ? styles.customerBubble : styles.salesBubble,
-      ]}
-    >
-      <Text style={styles.messageText}>{item.text}</Text>
-      <Text style={styles.messageTime}>{item.time}</Text>
+    <View style={[styles.messageBubble, item.is_sales ? styles.salesMessage : styles.customerMessage]}>
+      <Text style={styles.messageText}>{item.message_text}</Text>
+      <Text style={styles.messageTime}>{new Date(item.sent_at).toLocaleTimeString()}</Text>
     </View>
   );
 
@@ -142,46 +109,21 @@ const OrderChat = ({ navigation, route }) => {
     );
   }
 
-  if (!order) return null;
-
-  // Create a simple message history from cust_message and sales_message
-  const messages = [];
-  if (order.cust_message) {
-    messages.push({
-      sender: 'customer',
-      text: order.cust_message,
-      time: new Date(order.order_date).toLocaleTimeString(), // Note: this uses order_date, consider adding a timestamp if needed
-    });
-  }
-  if (order.sales_message) {
-    messages.push({
-      sender: 'sales',
-      text: order.sales_message,
-      time: new Date(order.order_date).toLocaleTimeString(),
-    });
-  }
-
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>订单 #{order.order_id} 聊天室</Text>
-      <Text style={styles.orderInfo}>总金额: ${order.total_amount} | 状态: {order.status}</Text>
-      <Text style={styles.orderInfo}>
-        付款状态: {order.payment_status === null ? '未付款' : order.payment_status}
-      </Text>
-
+      <Text style={styles.title}>订单 #{orderId} 聊天室</Text>
       <FlatList
         data={messages}
         renderItem={renderMessage}
-        keyExtractor={(item, index) => index.toString()}
+        keyExtractor={(item) => item.message_id.toString()}
         contentContainerStyle={styles.messageList}
       />
-
       <View style={styles.inputContainer}>
         <TextInput
           style={styles.input}
-          value={message}
-          onChangeText={setMessage}
-          placeholder={userRole === 'admin' ? '发送销售消息...' : '发送客户消息...'}
+          value={newMessage}
+          onChangeText={setNewMessage}
+          placeholder="输入消息..."
           multiline
         />
         <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
@@ -199,46 +141,47 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
-  },
-  orderInfo: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
+    marginBottom: 16,
   },
   messageList: {
-    flexGrow: 1,
-    paddingBottom: 16,
+    paddingBottom: 80, // Space for input area
   },
   messageBubble: {
     padding: 12,
     borderRadius: 8,
-    marginVertical: 4,
+    marginBottom: 12,
     maxWidth: '80%',
   },
-  customerBubble: {
-    backgroundColor: '#2CB696',
-    alignSelf: 'flex-end',
-  },
-  salesBubble: {
-    backgroundColor: '#ddd',
+  customerMessage: {
+    backgroundColor: '#e6f5f0',
     alignSelf: 'flex-start',
   },
+  salesMessage: {
+    backgroundColor: '#fff',
+    alignSelf: 'flex-end',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
   messageText: {
-    fontSize: 14,
+    fontSize: 16,
     color: '#333',
   },
   messageTime: {
-    fontSize: 10,
-    color: '#666',
+    fontSize: 12,
+    color: '#888',
     marginTop: 4,
+    textAlign: 'right',
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    position: 'absolute',
+    bottom: 16,
+    left: 16,
+    right: 16,
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 8,
@@ -250,7 +193,7 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 14,
+    fontSize: 16,
     padding: 8,
     maxHeight: 100,
   },
@@ -262,7 +205,7 @@ const styles = StyleSheet.create({
   },
   sendButtonText: {
     color: 'white',
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '500',
   },
   loadingContainer: {

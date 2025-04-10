@@ -1,4 +1,3 @@
-// screens/CheckoutConfirmation.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
@@ -19,9 +18,8 @@ const CheckoutConfirmation = ({ navigation, route }) => {
   const [address, setAddress] = useState({
     line1: '',
     line2: '',
-    city: '',
-    state: '',
-    postalCode: '',
+    district: '',
+    street: '',
     country: 'Hong Kong', // Default as per your schema
   });
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -78,7 +76,7 @@ const CheckoutConfirmation = ({ navigation, route }) => {
       const productIds = cartData.map((item) => item.product_id);
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('product_id, product_name, price, image_data') // Explicitly include image_data
+        .select('product_id, product_name, price, image_data')
         .in('product_id', productIds);
 
       if (productsError) throw productsError;
@@ -126,7 +124,7 @@ const CheckoutConfirmation = ({ navigation, route }) => {
       }
       setStep(2);
     } else if (step === 2) {
-      if (!address.line1 || !address.city || !address.state || !address.postalCode) {
+      if (!address.line1 || !address.district || !address.street) {
         Alert.alert('错误', '请填写所有必填地址字段');
         return;
       }
@@ -138,7 +136,7 @@ const CheckoutConfirmation = ({ navigation, route }) => {
       }
       Alert.alert(
         '确认',
-        `总金额: $${total}\n送货地址: ${address.line1}, ${address.city}, ${address.state}, ${address.postalCode}, ${address.country}\n付款方式: ${paymentMethod}`,
+        `总金额: $${total}\n送货地址: ${address.line1}${address.line2 ? ', ' + address.line2 : ''}, ${address.street}, ${address.district}, ${address.country}\n付款方式: ${paymentMethod}`,
         [
           { text: '取消', style: 'cancel' },
           { text: '确定', onPress: () => navigation.navigate('OrderCreation', { cartItems, total, address, paymentMethod }) },
@@ -180,21 +178,15 @@ const CheckoutConfirmation = ({ navigation, route }) => {
             />
             <TextInput
               style={styles.input}
-              placeholder="城市 *"
-              value={address.city}
-              onChangeText={(text) => setAddress({ ...address, city: text })}
+              placeholder="街道 *"
+              value={address.street}
+              onChangeText={(text) => setAddress({ ...address, street: text })}
             />
             <TextInput
               style={styles.input}
-              placeholder="州/省 *"
-              value={address.state}
-              onChangeText={(text) => setAddress({ ...address, state: text })}
-            />
-            <TextInput
-              style={styles.input}
-              placeholder="邮政编码 *"
-              value={address.postalCode}
-              onChangeText={(text) => setAddress({ ...address, postalCode: text })}
+              placeholder="地区 *"
+              value={address.district}
+              onChangeText={(text) => setAddress({ ...address, district: text })}
             />
             <TextInput
               style={styles.input}

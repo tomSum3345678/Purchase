@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Image, Alert, ActivityIndicator, StyleSheet, ScrollView } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { supabase } from './supabaseClient';
-import MimeType from 'react-native-mime-types';
 
 const AddProduct = ({ navigation }) => {
   const [form, setForm] = useState({
@@ -17,21 +17,35 @@ const AddProduct = ({ navigation }) => {
 
   // Request permission and pick image
   const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('权限拒绝', '需要访问相册权限以选择图片');
-      return;
-    }
+    try {
+      console.log('Attempting to request media library permissions...');
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      console.log('Permission status:', status);
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 0.8,
-      allowsEditing: true,
-      aspect: [4, 3],
-    });
+      if (status !== 'granted') {
+        Alert.alert('權限拒絕', '需要訪問相冊權限以選擇圖片');
+        return;
+      }
 
-    if (!result.canceled) {
-      setImage(result.assets[0].uri);
+      console.log('Launching image library...');
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        quality: 0.8,
+        allowsEditing: true,
+        aspect: [4, 3],
+      });
+
+      console.log('Image picker result:', result);
+
+      if (!result.canceled) {
+        setImage(result.assets[0].uri);
+        console.log('Image selected:', result.assets[0].uri);
+      } else {
+        console.log('Image selection canceled');
+      }
+    } catch (error) {
+      console.error('Error in pickImage:', error);
+      Alert.alert('錯誤', '選擇圖片時發生錯誤: ' + error.message);
     }
   };
 
@@ -39,7 +53,7 @@ const AddProduct = ({ navigation }) => {
   const handleUpload = async () => {
     if (!validateForm()) return;
     if (!image) {
-      Alert.alert('错误', '请选择产品图片');
+      Alert.alert('錯誤', '請選擇產品圖片');
       return;
     }
 
@@ -48,12 +62,13 @@ const AddProduct = ({ navigation }) => {
       const imageUrl = await uploadImage();
       await insertProduct(imageUrl);
       
-      Alert.alert('成功', '产品已成功添加', [
-        { text: '确定', onPress: () => navigation.goBack() }
+      Alert.alert('成功', '產品已成功添加', [
+        { text: '確定', onPress: () => navigation.goBack() },
       ]);
       resetForm();
     } catch (error) {
-      Alert.alert('错误', error.message || '添加产品时出错');
+      console.error('Upload error:', error);
+      Alert.alert('錯誤', error.message || '添加產品時出錯');
     } finally {
       setUploading(false);
     }
@@ -61,29 +76,69 @@ const AddProduct = ({ navigation }) => {
 
   // Upload image to Supabase 'image' bucket
   const uploadImage = async () => {
-    const mimeType = await MimeType.getType(image);
-    const extension = MimeType.extension(mimeType);
-    const fileName = `product_${Date.now()}.${extension}`;
+    try {
+      console.log('Uploading image URI:', image);
+      const fileExt = image.split('.').pop().toLowerCase() || 'jpg';
+      const fileName = `product_${Date.now()}.${fileExt}`;
+      console.log('Generated file name:', fileName);
 
-    const response = await fetch(image);
-    const blob = await response.blob();
-
-    const { data, error } = await supabase.storage
-      .from('image') // Changed to 'image' bucket
-      .upload(fileName, blob, {
-        cacheControl: '3600',
-        contentType: mimeType,
+      // Read the file as a Base64 string
+      const base64Data = await FileSystem.readAsStringAsync(image, {
+        encoding: FileSystem.EncodingType.Base64,
       });
+      console.log('Base64 data length:', base64Data.length);
 
-    if (error) throw new Error(`图片上传失败: ${error.message}`);
+      // Convert Base64 to a format Supabase accepts (raw binary)
+      const fileData = { uri: image, name: fileName, type: `image/${fileExt === 'jpeg' ? 'jpeg' : fileExt}` };
+      
+      // Determine content type
+      let contentType;
+      switch (fileExt) {
+        case 'jpg':
+        case 'jpeg':
+          contentType = 'image/jpeg';
+          break;
+        case 'png':
+          contentType = 'image/png';
+          break;
+        case 'gif':
+          contentType = 'image/gif';
+          break;
+        default:
+          contentType = 'image/jpeg'; // Fallback
+      }
+      console.log('Content type:', contentType);
 
-    const publicUrl = supabase.storage
-      .from('image')
-      .getPublicUrl(fileName).data.publicUrl;
+      // Upload to Supabase using the file URI directly
+      const { data, error } = await supabase.storage
+        .from('image')
+        .upload(fileName, {
+          uri: image,
+          type: contentType,
+          name: fileName,
+        }, {
+          cacheControl: '3600',
+          contentType: contentType,
+        });
 
-    if (!publicUrl) throw new Error('无法生成图片的公共URL');
+      if (error) {
+        console.error('Supabase upload error:', error);
+        throw new Error(`圖片上傳失敗: ${error.message}`);
+      }
+      console.log('Upload successful, data:', data);
 
-    return publicUrl;
+      const publicUrl = supabase.storage
+        .from('image')
+        .getPublicUrl(fileName).data.publicUrl;
+      console.log('Public URL:', publicUrl);
+
+      if (!publicUrl) throw new Error('無法生成圖片的公共URL');
+
+      return publicUrl;
+    } catch (error) {
+      console.error('Error in uploadImage:', error);
+      throw error;
+    }
   };
 
   // Insert product into database
@@ -97,22 +152,22 @@ const AddProduct = ({ navigation }) => {
       image_data: imageUrl,
     });
 
-    if (error) throw new Error(`数据库错误: ${error.message}`);
+    if (error) throw new Error(`數據庫錯誤: ${error.message}`);
   };
 
   // Validate form fields
   const validateForm = () => {
     const requiredFields = ['productName', 'price', 'stock', 'categoryId'];
-    if (requiredFields.some(field => !form[field].trim())) {
-      Alert.alert('错误', '请填写所有必填字段');
+    if (requiredFields.some((field) => !form[field].trim())) {
+      Alert.alert('錯誤', '請填寫所有必填字段');
       return false;
     }
     if (isNaN(form.price) || isNaN(form.stock) || isNaN(form.categoryId)) {
-      Alert.alert('错误', '价格、库存和分类ID必须为数字');
+      Alert.alert('錯誤', '價格、庫存和分類ID必須為數字');
       return false;
     }
     if (parseFloat(form.price) <= 0 || parseInt(form.stock) < 0 || parseInt(form.categoryId) <= 0) {
-      Alert.alert('错误', '价格必须大于0，库存不能为负数，分类ID必须为正数');
+      Alert.alert('錯誤', '價格必須大於0，庫存不能為負數，分類ID必須為正數');
       return false;
     }
     return true;
@@ -133,46 +188,46 @@ const AddProduct = ({ navigation }) => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>添加新产品</Text>
+        <Text style={styles.title}>添加新產品</Text>
       </View>
 
       <View style={styles.formContainer}>
         <TextInput
-          placeholder="产品名称 *"
+          placeholder="產品名稱 *"
           value={form.productName}
-          onChangeText={v => setForm(p => ({ ...p, productName: v }))}
+          onChangeText={(v) => setForm((p) => ({ ...p, productName: v }))}
           style={styles.input}
           placeholderTextColor="#999"
         />
         <TextInput
-          placeholder="描述（可选）"
+          placeholder="描述（可選）"
           value={form.description}
-          onChangeText={v => setForm(p => ({ ...p, description: v }))}
+          onChangeText={(v) => setForm((p) => ({ ...p, description: v }))}
           style={[styles.input, styles.textArea]}
           multiline
           numberOfLines={3}
           placeholderTextColor="#999"
         />
         <TextInput
-          placeholder="价格（HKD） *"
+          placeholder="價格（HKD） *"
           value={form.price}
-          onChangeText={v => setForm(p => ({ ...p, price: v }))}
+          onChangeText={(v) => setForm((p) => ({ ...p, price: v }))}
           keyboardType="numeric"
           style={styles.input}
           placeholderTextColor="#999"
         />
         <TextInput
-          placeholder="库存数量 *"
+          placeholder="庫存數量 *"
           value={form.stock}
-          onChangeText={v => setForm(p => ({ ...p, stock: v }))}
+          onChangeText={(v) => setForm((p) => ({ ...p, stock: v }))}
           keyboardType="numeric"
           style={styles.input}
           placeholderTextColor="#999"
         />
         <TextInput
-          placeholder="分类ID *"
+          placeholder="分類ID *"
           value={form.categoryId}
-          onChangeText={v => setForm(p => ({ ...p, categoryId: v }))}
+          onChangeText={(v) => setForm((p) => ({ ...p, categoryId: v }))}
           keyboardType="numeric"
           style={styles.input}
           placeholderTextColor="#999"
@@ -183,12 +238,10 @@ const AddProduct = ({ navigation }) => {
           onPress={pickImage}
           disabled={uploading}
         >
-          <Text style={styles.buttonText}>选择图片</Text>
+          <Text style={styles.buttonText}>選擇圖片</Text>
         </TouchableOpacity>
 
-        {image && (
-          <Image source={{ uri: image }} style={styles.imagePreview} />
-        )}
+        {image && <Image source={{ uri: image }} style={styles.imagePreview} />}
 
         <TouchableOpacity
           style={[styles.submitButton, uploading && styles.buttonDisabled]}
@@ -198,7 +251,7 @@ const AddProduct = ({ navigation }) => {
           {uploading ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.buttonText}>提交产品</Text>
+            <Text style={styles.buttonText}>提交產品</Text>
           )}
         </TouchableOpacity>
       </View>

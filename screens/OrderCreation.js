@@ -15,7 +15,6 @@ const OrderCreation = ({ navigation, route }) => {
   const [orderDetails, setOrderDetails] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Hide the navigation header
   useEffect(() => {
     navigation.setOptions({
       headerShown: false,
@@ -48,7 +47,7 @@ const OrderCreation = ({ navigation, route }) => {
         }
         const userId = userData.user_id;
 
-        // Insert into orders table with payment_method
+        // Insert into orders table (updated fields)
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
           .insert({
@@ -57,9 +56,8 @@ const OrderCreation = ({ navigation, route }) => {
             status: 'pending',
             delivery_address_line1: address.line1,
             delivery_address_line2: address.line2 || null,
-            delivery_city: address.city,
-            delivery_state: address.state,
-            delivery_postal_code: address.postalCode,
+            delivery_district: address.district,
+            delivery_street: address.street,
             delivery_country: address.country || 'Hong Kong',
             payment_status: null,
             payment_method: paymentMethod,
@@ -91,7 +89,7 @@ const OrderCreation = ({ navigation, route }) => {
 
         if (cartError) throw cartError;
 
-        // Fetch product images for each item in cartItems
+        // Fetch product images
         const productIds = cartItems.map((item) => item.product_id);
         const { data: productsData, error: productsError } = await supabase
           .from('products')
@@ -100,7 +98,6 @@ const OrderCreation = ({ navigation, route }) => {
 
         if (productsError) throw productsError;
 
-        // Merge image_data into cartItems
         const updatedCartItems = cartItems.map((item) => {
           const product = productsData.find((p) => p.product_id === item.product_id);
           return {
@@ -156,68 +153,57 @@ const OrderCreation = ({ navigation, route }) => {
   if (!orderDetails) return null;
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Icon name="check-circle" size={40} color="#2CB696" />
-        <Text style={styles.successTitle}>订单创建成功！</Text>
-        <Text style={styles.orderId}>订单编号: #{orderDetails.orderId}</Text>
-      </View>
+    <FlatList
+      data={orderDetails.cartItems}
+      renderItem={renderItem}
+      keyExtractor={(item) => item.product_id.toString()}
+      ListHeaderComponent={
+        <>
+          <View style={styles.header}>
+            <Icon name="check-circle" size={40} color="#2CB696" />
+            <Text style={styles.successTitle}>订单创建成功！</Text>
+            <Text style={styles.orderId}>订单编号: #{orderDetails.orderId}</Text>
+          </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>订购商品</Text>
-        <FlatList
-          data={orderDetails.cartItems}
-          renderItem={renderItem}
-          keyExtractor={(item) => item.product_id.toString()}
-          contentContainerStyle={styles.list}
-        />
-        <Text style={styles.total}>总金额: ${orderDetails.total}</Text>
-      </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>送货地址</Text>
+            <Text style={styles.addressText}>{orderDetails.address.line1}</Text>
+            {orderDetails.address.line2 && (
+              <Text style={styles.addressText}>{orderDetails.address.line2}</Text>
+            )}
+            <Text style={styles.addressText}>
+              {orderDetails.address.street}, {orderDetails.address.district}
+            </Text>
+            <Text style={styles.addressText}>{orderDetails.address.country}</Text>
+          </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>送货地址</Text>
-        <Text style={styles.addressText}>{orderDetails.address.line1}</Text>
-        {orderDetails.address.line2 && (
-          <Text style={styles.addressText}>{orderDetails.address.line2}</Text>
-        )}
-        <Text style={styles.addressText}>
-          {orderDetails.address.city}, {orderDetails.address.state}, {orderDetails.address.postalCode}
-        </Text>
-        <Text style={styles.addressText}>{orderDetails.address.country}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>付款方式</Text>
-        <Text style={styles.detailText}>{orderDetails.paymentMethod}</Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>付款状态</Text>
-        <Text style={styles.detailText}>
-          {orderDetails.paymentStatus === null ? '未付款' : orderDetails.paymentStatus}
-        </Text>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>订单日期</Text>
-        <Text style={styles.detailText}>{orderDetails.orderDate}</Text>
-      </View>
-
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.homeButton}
-          onPress={() => navigation.navigate('HomePage')}
-        >
-          <Text style={styles.buttonText}>返回首页</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>付款方式</Text>
+            <Text style={styles.detailText}>{orderDetails.paymentMethod}</Text>
+          </View>
+        </>
+      }
+      ListFooterComponent={
+        <>
+          <Text style={styles.total}>总金额: ${orderDetails.total}</Text>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={styles.homeButton}
+              onPress={() => navigation.navigate('HomePage')}
+            >
+              <Text style={styles.buttonText}>返回首页</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      }
+      contentContainerStyle={styles.container}
+    />
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1, // Changed to flexGrow for FlatList
     backgroundColor: '#f5f5f5',
     padding: 16,
   },
@@ -261,9 +247,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 8,
   },
-  list: {
-    paddingBottom: 8,
-  },
   itemCard: {
     flexDirection: 'row',
     padding: 8,
@@ -306,20 +289,11 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'right',
     marginTop: 8,
-  },
-  addressText: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 4,
-  },
-  detailText: {
-    fontSize: 14,
-    color: '#333',
+    marginBottom: 16,
   },
   buttonContainer: {
     flexDirection: 'row',
-    justifyContent: 'center', // Center the single button
-    marginTop: 20,
+    justifyContent: 'center',
     paddingBottom: 16,
   },
   homeButton: {

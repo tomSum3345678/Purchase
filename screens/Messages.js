@@ -17,7 +17,7 @@ const Messages = ({ navigation }) => {
   const [userRole, setUserRole] = useState(null);
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchOrdersWithMessages = async () => {
       try {
         const email = await AsyncStorage.getItem('isLoggedIn');
         if (!email) {
@@ -44,32 +44,50 @@ const Messages = ({ navigation }) => {
           // Sales: Fetch all orders with messages
           ordersQuery = supabase
             .from('orders')
-            .select('order_id, user_id, total_amount, status, payment_status, cust_message, sales_message')
-            .or('cust_message.is.not.null, sales_message.is.not.null')
+            .select('order_id, user_id, total_amount, status, payment_status')
             .order('order_date', { ascending: false });
         } else {
           // Customer: Fetch their own orders
           ordersQuery = supabase
             .from('orders')
-            .select('order_id, user_id, total_amount, status, payment_status, cust_message, sales_message')
+            .select('order_id, user_id, total_amount, status, payment_status')
             .eq('user_id', userId)
             .order('order_date', { ascending: false });
         }
 
         const { data: ordersData, error: ordersError } = await ordersQuery;
-
         if (ordersError) throw ordersError;
 
-        setOrders(ordersData || []);
+        // Fetch latest message for each order
+        const orderIds = ordersData.map((order) => order.order_id);
+        const { data: messagesData, error: messagesError } = await supabase
+          .from('order_messages')
+          .select('order_id, message_text, sent_at, is_sales')
+          .in('order_id', orderIds)
+          .order('sent_at', { ascending: false })
+          .limit(1, { per: 'order_id' }); // Get the latest message per order
+
+        if (messagesError) throw messagesError;
+
+        const enrichedOrders = ordersData.map((order) => {
+          const latestMessage = messagesData.find((msg) => msg.order_id === order.order_id);
+          return {
+            ...order,
+            latestMessage: latestMessage ? latestMessage.message_text : null,
+            isSalesMessage: latestMessage ? latestMessage.is_sales : false,
+          };
+        });
+
+        setOrders(enrichedOrders);
         setLoading(false);
       } catch (error) {
-        console.error('Error fetching orders:', error.message || error);
+        console.error('Error fetching orders with messages:', error.message || error);
         Alert.alert('错误', '无法加载消息列表');
         setLoading(false);
       }
     };
 
-    fetchOrders();
+    fetchOrdersWithMessages();
   }, [navigation]);
 
   const renderChatRoom = ({ item }) => (
@@ -80,11 +98,10 @@ const Messages = ({ navigation }) => {
       <Text style={styles.orderId}>订单编号: #{item.order_id}</Text>
       <Text style={styles.orderTotal}>总金额: ${item.total_amount}</Text>
       <Text style={styles.orderStatus}>状态: {item.status}</Text>
-      {item.cust_message && (
-        <Text style={styles.messagePreview}>客户: {item.cust_message.slice(0, 30)}...</Text>
-      )}
-      {item.sales_message && (
-        <Text style={styles.messagePreview}>销售: {item.sales_message.slice(0, 30)}...</Text>
+      {item.latestMessage && (
+        <Text style={styles.messagePreview}>
+          {item.isSalesMessage ? '销售' : '客户'}: {item.latestMessage.slice(0, 30)}...
+        </Text>
       )}
     </TouchableOpacity>
   );
