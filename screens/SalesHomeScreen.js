@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import SalesHeader from './SalesHeader';
 import AdminBar from './AdminBar';
+import { supabase } from './supabaseClient'; // Assuming supabaseClient is set up
 
 const OrderScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -11,82 +12,166 @@ const OrderScreen = ({ navigation }) => {
   const [orders, setOrders] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [counts, setCounts] = useState({ unpaid: 0, pendingReview: 0 });
 
-  // 状态映射：英文（数据库）到中文（显示）
+  // Status mappings
   const statusMap = {
-    'pending': '待处理',
-    'shipped': '已发货',
-    'completed': '已完成',
-    'cancelled': '已取消'
+    pending: '待处理',
+    shipped: '已发货',
+    completed: '已完成',
+    cancelled: '已取消',
   };
 
-  // 示例数据生成器（模拟数据库数据，保持英文状态）
-  const generateOrders = (count) => {
-    return Array.from({ length: count }, (_, i) => ({
-      id: String(i + 1),
-      orderNumber: `ORD-202310${String(i + 1).padStart(2, '0')}`,
-      customer: `客户 ${i + 1}`,
-      date: `2023-10-${String(Math.floor(i/5) + 1).padStart(2, '0')}`,
-      total: Math.floor(Math.random() * 500) + 50,
-      status: ['pending', 'shipped', 'completed', 'cancelled'][i % 4] // 英文状态，与数据库一致
-    }));
+  const paymentStatusMap = {
+    null: '未付款',
+    pending_review: '待审核',
+    paid: '已付款',
   };
 
-  // 模拟API调用
+  // Fetch order counts for unpaid and pending_review
+  const fetchOrderCounts = async () => {
+    try {
+      const { data: unpaidData, error: unpaidError } = await supabase
+        .from('orders')
+        .select('order_id', { count: 'exact' })
+        .is('payment_status', null);
+
+      if (unpaidError) throw unpaidError;
+
+      const { data: pendingReviewData, error: pendingReviewError } = await supabase
+        .from('orders')
+        .select('order_id', { count: 'exact' })
+        .eq('payment_status', 'pending_review');
+
+      if (pendingReviewError) throw pendingReviewError;
+
+      setCounts({
+        unpaid: unpaidData.length,
+        pendingReview: pendingReviewData.length,
+      });
+    } catch (error) {
+      console.error('Error fetching order counts:', error.message || error);
+    }
+  };
+
+  // Fetch orders from Supabase
   const loadMoreOrders = async () => {
     if (isLoading || !hasMore) return;
-    
-    setIsLoading(true);
-    
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const newOrders = generateOrders(20);
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const paginatedOrders = newOrders.slice(startIndex, startIndex + itemsPerPage);
-    
-    if (paginatedOrders.length === 0) {
-      setHasMore(false);
-      setIsLoading(false);
-      return;
-    }
 
-    setOrders(prev => [...prev, ...paginatedOrders]);
-    setCurrentPage(prev => prev + 1);
-    setIsLoading(false);
+    setIsLoading(true);
+
+    try {
+      let query = supabase
+        .from('orders')
+        .select(`
+          order_id,
+          order_date,
+          total_amount,
+          status,
+          payment_status,
+          user_id,
+          users!inner(username)
+        `)
+        .range((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage - 1)
+        .order('order_date', { ascending: false });
+
+      // Apply filters
+      if (selectedStatus !== 'all') {
+        if (['pending', 'shipped', 'completed', 'cancelled'].includes(selectedStatus)) {
+          query = query.eq('status', selectedStatus);
+        } else if (selectedStatus === 'unpaid') {
+          query = query.is('payment_status', null);
+        } else if (selectedStatus === 'pending_review') {
+          query = query.eq('payment_status', 'pending_review');
+        } else if (selectedStatus === 'paid') {
+          query = query.eq('payment_status', 'paid');
+        }
+      }
+
+      // Apply search query
+      if (searchQuery) {
+        query = query.ilike('users.username', `%${searchQuery}%`);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      if (data.length < itemsPerPage) {
+        setHasMore(false);
+      }
+
+      setOrders(prev => [
+        ...prev,
+        ...data.map(order => ({
+          id: order.order_id.toString(),
+          orderNumber: `ORD-${order.order_id.toString().padStart(6, '0')}`,
+          customer: order.users.username,
+          date: new Date(order.order_date).toLocaleDateString('zh-CN'),
+          total: order.total_amount,
+          status: order.status,
+          payment_status: order.payment_status,
+        })),
+      ]);
+      setCurrentPage(prev => prev + 1);
+    } catch (error) {
+      console.error('Error fetching orders:', error.message || error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
     navigation.setOptions({
       headerShown: false,
     });
-    // 初始加载订单
+    // Reset and load initial orders
+    setOrders([]);
+    setCurrentPage(1);
+    setHasMore(true);
     loadMoreOrders();
-  }, [navigation]);
+    fetchOrderCounts();
+  }, [selectedStatus, searchQuery]);
 
-  // 状态筛选器（英文ID用于逻辑，中文label用于显示）
+  // Status filters
   const statusFilters = [
     { id: 'all', label: '全部' },
     { id: 'pending', label: '待处理' },
     { id: 'shipped', label: '已发货' },
     { id: 'completed', label: '已完成' },
-    { id: 'cancelled', label: '已取消' }
+    { id: 'cancelled', label: '已取消' },
+    { id: 'unpaid', label: `未付款 (${counts.unpaid})` },
+    { id: 'pending_review', label: `待审核 (${counts.pendingReview})` },
+    { id: 'paid', label: '已付款' },
   ];
 
   const renderOrderItem = ({ item }) => (
     <View style={styles.orderCard}>
       <View style={styles.orderHeader}>
         <Text style={styles.orderNumber}>订单号: {item.orderNumber}</Text>
-        <Text style={[styles.statusLabel, 
-          { backgroundColor: 
-            item.status === 'pending' ? '#ffa726' : 
-            item.status === 'shipped' ? '#42a5f5' : 
-            item.status === 'completed' ? '#66bb6a' : '#ef5350'
-          }]}>
-          {statusMap[item.status]} {/* 显示中文状态 */}
+        <Text
+          style={[
+            styles.statusLabel,
+            {
+              backgroundColor:
+                item.status === 'pending'
+                  ? '#ffa726'
+                  : item.status === 'shipped'
+                  ? '#42a5f5'
+                  : item.status === 'completed'
+                  ? '#66bb6a'
+                  : '#ef5350',
+            },
+          ]}
+        >
+          {statusMap[item.status]}
         </Text>
       </View>
       <Text style={styles.customerText}>客户: {item.customer}</Text>
       <Text style={styles.dateText}>日期: {item.date}</Text>
+      <Text style={styles.paymentStatusText}>
+        付款状态: {paymentStatusMap[item.payment_status] || item.payment_status}
+      </Text>
       <View style={styles.orderFooter}>
         <Text style={styles.totalText}>总计: ${item.total.toFixed(2)}</Text>
         <TouchableOpacity style={styles.detailButton}>
@@ -97,11 +182,13 @@ const OrderScreen = ({ navigation }) => {
   );
 
   const renderFooter = () => {
-    if (!isLoading && !hasMore) return (
-      <View style={styles.footerContainer}>
-        <Text style={styles.footerText}>没有更多订单可加载</Text>
-      </View>
-    );
+    if (!isLoading && !hasMore) {
+      return (
+        <View style={styles.footerContainer}>
+          <Text style={styles.footerText}>没有更多订单可加载</Text>
+        </View>
+      );
+    }
 
     return isLoading ? (
       <View style={styles.footerContainer}>
@@ -114,41 +201,43 @@ const OrderScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <SalesHeader />
-      {/* 导航栏 */}
+      {/* Navigation bar */}
       <View style={styles.navbar}>
         <Text style={styles.navTitle}>訂單管理</Text>
       </View>
 
-      {/* 搜索栏 */}
+      {/* Counts display */}
+      <View style={styles.countsContainer}>
+        <Text style={styles.countsText}>未付款订单: {counts.unpaid}</Text>
+        <Text style={styles.countsText}>待审核订单: {counts.pendingReview}</Text>
+      </View>
+
+      {/* Search bar */}
       <TextInput
         style={styles.searchInput}
-        placeholder="搜索订单..."
+        placeholder="搜索客户名称..."
         value={searchQuery}
         onChangeText={setSearchQuery}
       />
 
-      {/* 状态筛选 */}
+      {/* Status filters */}
       <View style={styles.filterContainer}>
         {statusFilters.map(filter => (
           <TouchableOpacity
             key={filter.id}
-            style={[
-              styles.filterButton,
-              selectedStatus === filter.id && styles.activeFilter
-            ]}
+            style={[styles.filterButton, selectedStatus === filter.id && styles.activeFilter]}
             onPress={() => setSelectedStatus(filter.id)}
           >
-            <Text style={[
-              styles.filterText,
-              selectedStatus === filter.id && styles.activeFilterText
-            ]}>
+            <Text
+              style={[styles.filterText, selectedStatus === filter.id && styles.activeFilterText]}
+            >
               {filter.label}
             </Text>
           </TouchableOpacity>
         ))}
       </View>
 
-      {/* 订单列表 */}
+      {/* Order list */}
       <FlatList
         data={orders}
         renderItem={renderOrderItem}
@@ -184,6 +273,17 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: 'bold',
   },
+  countsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  countsText: {
+    fontSize: 14,
+    color: '#333',
+    fontWeight: '500',
+  },
   searchInput: {
     backgroundColor: 'white',
     borderRadius: 8,
@@ -217,7 +317,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 80, // 避免与AdminBar重叠
+    paddingBottom: 80, // Avoid overlap with AdminBar
   },
   orderCard: {
     backgroundColor: 'white',
@@ -249,6 +349,11 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   dateText: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 4,
+  },
+  paymentStatusText: {
     fontSize: 14,
     color: '#666',
     marginBottom: 12,
