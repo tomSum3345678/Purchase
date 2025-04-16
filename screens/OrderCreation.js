@@ -1,4 +1,3 @@
-// screens/OrderCreation.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert, Image } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
@@ -47,7 +46,7 @@ const OrderCreation = ({ navigation, route }) => {
         }
         const userId = userData.user_id;
 
-        // Insert into orders table (updated fields)
+        // Insert into orders table
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
           .insert({
@@ -179,7 +178,12 @@ const OrderCreation = ({ navigation, route }) => {
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>付款方式</Text>
-            <Text style={styles.detailText}>{orderDetails.paymentMethod}</Text>
+            <Text style={styles.detailText}>
+              {orderDetails.paymentMethod === 'WeChat' ? '微信支付' : orderDetails.paymentMethod}
+            </Text>
+            <Text style={styles.detailText}>
+              请稍后上传付款证明图片以完成订单。
+            </Text>
           </View>
         </>
       }
@@ -203,7 +207,7 @@ const OrderCreation = ({ navigation, route }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1, // Changed to flexGrow for FlatList
+    flexGrow: 1,
     backgroundColor: '#f5f5f5',
     padding: 16,
   },
@@ -306,6 +310,16 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '500',
+  },
+  addressText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
+  },
+  detailText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 4,
   },
 });
 

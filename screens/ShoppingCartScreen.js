@@ -1,9 +1,9 @@
-// screens/ShoppingCart.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, Image, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import CustBar from './CustBar'; // Import CustBar component
 
 // Supabase configuration
 const supabaseUrl = 'https://ebvecgyezvakcxlegspv.supabase.co';
@@ -170,6 +170,7 @@ const ShoppingCart = ({ navigation }) => {
           </View>
         </>
       )}
+      <CustBar navigation={navigation} activeScreen="ShoppingCart" />
     </View>
   );
 };
@@ -181,6 +182,7 @@ const styles = StyleSheet.create({
   },
   list: {
     padding: 16,
+    paddingBottom: 100, // Add padding to prevent overlap with CustBar
   },
   card: {
     backgroundColor: 'white',
@@ -241,6 +243,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    position: 'absolute',
+    bottom: 60, // Position above CustBar
+    left: 0,
+    right: 0,
   },
   total: {
     fontSize: 18,
@@ -262,6 +268,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: 60, // Prevent overlap with CustBar
   },
   emptyText: {
     fontSize: 18,

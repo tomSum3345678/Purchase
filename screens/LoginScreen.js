@@ -80,7 +80,7 @@ const LoginScreen = ({ navigation }) => {
 
         <View style={{ backgroundColor: Platform.OS == "web" ? 'rgba(255, 255, 255, 0.45)' : "", marginHorizontal: Platform.OS == "web" ? Dimensions.get("window").width > 1000 ? "32%" : "18%" : "0", borderRadius: 10 }}>
           <View style={{ display: "flex", alignItems: "center", marginBottom: 20 }}>
-            <Text style={{ fontSize: 48, fontStyle: "italic", color: Platform.OS == "web" ? "rgb(156, 61, 61)" : "rgb(13, 86, 122)" }}>BargainBazaar</Text>
+            <Text style={{ fontSize: 48, fontStyle: "italic", color: Platform.OS == "web" ? "rgb(156, 61, 61)" : "rgb(13, 86, 122)" }}>SYW BookHub</Text>
           </View>
           <View style={{ margin: Platform.OS == "web" ? "40px" : "0" }}>
             <TextInput style={styles.input}

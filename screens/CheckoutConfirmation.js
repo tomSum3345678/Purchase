@@ -150,7 +150,7 @@ const CheckoutConfirmation = ({ navigation, route }) => {
       case 1: // Review Items
         return (
           <View style={styles.stepContainer}>
-            <Text style={styles.sectionTitle}>确认购买商品</Text>
+            <Text style={styles.sectionTitle}>确认购买图书</Text>
             <FlatList
               data={cartItems}
               renderItem={renderItem}
@@ -201,22 +201,16 @@ const CheckoutConfirmation = ({ navigation, route }) => {
           <View style={styles.stepContainer}>
             <Text style={styles.sectionTitle}>选择付款方式</Text>
             <TouchableOpacity
-              style={[styles.optionButton, paymentMethod === 'Credit Card' && styles.selectedOption]}
-              onPress={() => setPaymentMethod('Credit Card')}
+              style={[styles.optionButton, paymentMethod === 'PayMe' && styles.selectedOption]}
+              onPress={() => setPaymentMethod('PayMe')}
             >
-              <Text style={styles.optionText}>信用卡</Text>
+              <Text style={styles.optionText}>PayMe</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.optionButton, paymentMethod === 'PayPal' && styles.selectedOption]}
-              onPress={() => setPaymentMethod('PayPal')}
+              style={[styles.optionButton, paymentMethod === 'WeChat' && styles.selectedOption]}
+              onPress={() => setPaymentMethod('WeChat')}
             >
-              <Text style={styles.optionText}>PayPal</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.optionButton, paymentMethod === 'Cash on Delivery' && styles.selectedOption]}
-              onPress={() => setPaymentMethod('Cash on Delivery')}
-            >
-              <Text style={styles.optionText}>货到付款</Text>
+              <Text style={styles.optionText}>微信支付</Text>
             </TouchableOpacity>
           </View>
         );
@@ -228,7 +222,7 @@ const CheckoutConfirmation = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
       <View style={styles.stepIndicator}>
-        <Text style={[styles.stepText, step === 1 && styles.activeStep]}>1. 确认商品</Text>
+        <Text style={[styles.stepText, step === 1 && styles.activeStep]}>1. 确认图书</Text>
         <Text style={[styles.stepText, step === 2 && styles.activeStep]}>2. 送货地址</Text>
         <Text style={[styles.stepText, step === 3 && styles.activeStep]}>3. 付款方式</Text>
       </View>

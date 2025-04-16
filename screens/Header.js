@@ -48,7 +48,7 @@ const Header = ({ showSearch = false, searchQuery, setSearchQuery }) => {
 
   return (
     <View style={styles.navbar}>
-      <Text style={styles.logo}>BargainBazaar</Text>
+      <Text style={styles.logo}>SSW BookHub</Text>
       
       {showSearch && (
         <View style={styles.searchBar}>

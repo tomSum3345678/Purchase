@@ -140,7 +140,7 @@ const ProductDetail = ({ route, navigation }) => {
           <Text style={styles.stock}>{product.stock} in stock</Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Product Description</Text>
+        <Text style={styles.sectionTitle}>产品简述</Text>
         <Text style={styles.description}>{product.description}</Text>
 
         <View style={styles.metaInfo}>
@@ -159,7 +159,7 @@ const ProductDetail = ({ route, navigation }) => {
           onPress={() => setModalVisible(true)}
         >
           <Icon name="shopping-cart" size={20} color="white" />
-          <Text style={styles.buttonText}>加入購物車</Text>
+          <Text style={styles.buttonText}> 加入購物車</Text>
         </TouchableOpacity>
       </View>
 

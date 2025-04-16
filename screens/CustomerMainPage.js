@@ -44,13 +44,12 @@ const MainPage = ({ navigation }) => {
   }, [navigation]);
 
   const categories = [
-    { id: 'All', name: 'All' },
-    { id: 1, name: 'Fashion' },
-    { id: 2, name: 'Electronics' },
-    { id: 3, name: 'Home & Living' },
-    { id: 4, name: 'Books' },
-    { id: 5, name: 'Sports' },
-    { id: 6, name: 'Toys' },
+    { id: 'All', name: '全部' },
+    { id: 1, name: '武侠' },
+    { id: 2, name: '烹饪' },
+    { id: 3, name: '编程' },
+    { id: 4, name: '历史' },
+    { id: 5, name: '自传' },
   ];
 
   useEffect(() => {
@@ -104,7 +103,7 @@ const MainPage = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.navbar}>
-        <Text style={styles.logo}>BargainBazaar</Text>
+        <Text style={styles.logo}>SSW BookHub</Text>
         <View
           style={isSmallScreen ? styles.searchBarMobile : styles.searchBarWeb}
         >

@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import SalesHeader from './SalesHeader';
+import AdminBar from './AdminBar';
 
-const OrderScreen = () => {
+const OrderScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -11,28 +12,35 @@ const OrderScreen = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
 
-  // Example data generator
+  // 状态映射：英文（数据库）到中文（显示）
+  const statusMap = {
+    'pending': '待处理',
+    'shipped': '已发货',
+    'completed': '已完成',
+    'cancelled': '已取消'
+  };
+
+  // 示例数据生成器（模拟数据库数据，保持英文状态）
   const generateOrders = (count) => {
     return Array.from({ length: count }, (_, i) => ({
       id: String(i + 1),
       orderNumber: `ORD-202310${String(i + 1).padStart(2, '0')}`,
-      customer: `Customer ${i + 1}`,
+      customer: `客户 ${i + 1}`,
       date: `2023-10-${String(Math.floor(i/5) + 1).padStart(2, '0')}`,
       total: Math.floor(Math.random() * 500) + 50,
-      status: ['pending', 'shipped', 'completed', 'cancelled'][i % 4]
+      status: ['pending', 'shipped', 'completed', 'cancelled'][i % 4] // 英文状态，与数据库一致
     }));
   };
 
-  // Simulated API call
+  // 模拟API调用
   const loadMoreOrders = async () => {
     if (isLoading || !hasMore) return;
     
     setIsLoading(true);
     
-    // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 1000));
     
-    const newOrders = generateOrders(20); // Simulate 20 total orders
+    const newOrders = generateOrders(20);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const paginatedOrders = newOrders.slice(startIndex, startIndex + itemsPerPage);
     
@@ -48,36 +56,41 @@ const OrderScreen = () => {
   };
 
   useEffect(() => {
+    navigation.setOptions({
+      headerShown: false,
+    });
+    // 初始加载订单
     loadMoreOrders();
-  }, []);
+  }, [navigation]);
 
+  // 状态筛选器（英文ID用于逻辑，中文label用于显示）
   const statusFilters = [
-    { id: 'all', label: 'All' },
-    { id: 'pending', label: 'Pending' },
-    { id: 'shipped', label: 'Shipped' },
-    { id: 'completed', label: 'Completed' },
-    { id: 'cancelled', label: 'Cancelled' }
+    { id: 'all', label: '全部' },
+    { id: 'pending', label: '待处理' },
+    { id: 'shipped', label: '已发货' },
+    { id: 'completed', label: '已完成' },
+    { id: 'cancelled', label: '已取消' }
   ];
 
   const renderOrderItem = ({ item }) => (
     <View style={styles.orderCard}>
       <View style={styles.orderHeader}>
-        <Text style={styles.orderNumber}>Order #: {item.orderNumber}</Text>
+        <Text style={styles.orderNumber}>订单号: {item.orderNumber}</Text>
         <Text style={[styles.statusLabel, 
           { backgroundColor: 
             item.status === 'pending' ? '#ffa726' : 
             item.status === 'shipped' ? '#42a5f5' : 
             item.status === 'completed' ? '#66bb6a' : '#ef5350'
           }]}>
-          {item.status.charAt(0).toUpperCase() + item.status.slice(1)}
+          {statusMap[item.status]} {/* 显示中文状态 */}
         </Text>
       </View>
-      <Text style={styles.customerText}>Customer: {item.customer}</Text>
-      <Text style={styles.dateText}>Date: {item.date}</Text>
+      <Text style={styles.customerText}>客户: {item.customer}</Text>
+      <Text style={styles.dateText}>日期: {item.date}</Text>
       <View style={styles.orderFooter}>
-        <Text style={styles.totalText}>Total: ${item.total.toFixed(2)}</Text>
+        <Text style={styles.totalText}>总计: ${item.total.toFixed(2)}</Text>
         <TouchableOpacity style={styles.detailButton}>
-          <Text style={styles.detailButtonText}>View Details</Text>
+          <Text style={styles.detailButtonText}>查看详情</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -86,14 +99,14 @@ const OrderScreen = () => {
   const renderFooter = () => {
     if (!isLoading && !hasMore) return (
       <View style={styles.footerContainer}>
-        <Text style={styles.footerText}>No more orders to load</Text>
+        <Text style={styles.footerText}>没有更多订单可加载</Text>
       </View>
     );
 
     return isLoading ? (
       <View style={styles.footerContainer}>
         <ActivityIndicator size="small" color="#003366" />
-        <Text style={styles.footerText}>Loading more orders...</Text>
+        <Text style={styles.footerText}>正在加载更多订单...</Text>
       </View>
     ) : null;
   };
@@ -101,20 +114,20 @@ const OrderScreen = () => {
   return (
     <View style={styles.container}>
       <SalesHeader />
-      {/* Navigation Bar */}
+      {/* 导航栏 */}
       <View style={styles.navbar}>
-        <Text style={styles.navTitle}>Order Management</Text>
+        <Text style={styles.navTitle}>訂單管理</Text>
       </View>
 
-      {/* Search Bar */}
+      {/* 搜索栏 */}
       <TextInput
         style={styles.searchInput}
-        placeholder="Search orders..."
+        placeholder="搜索订单..."
         value={searchQuery}
         onChangeText={setSearchQuery}
       />
 
-      {/* Status Filters */}
+      {/* 状态筛选 */}
       <View style={styles.filterContainer}>
         {statusFilters.map(filter => (
           <TouchableOpacity
@@ -135,14 +148,14 @@ const OrderScreen = () => {
         ))}
       </View>
 
-      {/* Order List */}
+      {/* 订单列表 */}
       <FlatList
         data={orders}
         renderItem={renderOrderItem}
         keyExtractor={item => item.id}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No orders found</Text>
+            <Text style={styles.emptyText}>未找到订单</Text>
           </View>
         }
         ListFooterComponent={renderFooter}
@@ -150,6 +163,8 @@ const OrderScreen = () => {
         onEndReachedThreshold={0.2}
         contentContainerStyle={styles.listContent}
       />
+
+      <AdminBar navigation={navigation} activeScreen="SalesHome" />
     </View>
   );
 };
@@ -202,7 +217,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 20,
+    paddingBottom: 80, // 避免与AdminBar重叠
   },
   orderCard: {
     backgroundColor: 'white',

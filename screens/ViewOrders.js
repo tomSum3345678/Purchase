@@ -1,10 +1,9 @@
-// screens/ViewOrders.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import CustBar from './CustBar'; // Import the bottom navigation bar
+import CustBar from './CustBar';
 
 // Supabase configuration
 const supabaseUrl = 'https://ebvecgyezvakcxlegspv.supabase.co';
@@ -37,7 +36,6 @@ const ViewOrders = ({ navigation }) => {
         }
         const userId = userData.user_id;
 
-        // Fetch orders for the current user
         const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
           .select('*')
@@ -46,7 +44,6 @@ const ViewOrders = ({ navigation }) => {
 
         if (ordersError) throw ordersError;
 
-        // Fetch order items for each order
         const orderIds = ordersData.map((order) => order.order_id);
         const { data: itemsData, error: itemsError } = await supabase
           .from('order_items')
@@ -55,7 +52,6 @@ const ViewOrders = ({ navigation }) => {
 
         if (itemsError) throw itemsError;
 
-        // Merge order items with product names
         const enrichedOrders = ordersData.map((order) => ({
           ...order,
           cartItems: itemsData
@@ -110,9 +106,11 @@ const ViewOrders = ({ navigation }) => {
   };
 
   const handlePayOrder = (order) => {
-    // Placeholder for payment logic
-    Alert.alert('支付', '此功能待实现。请联系管理员完成支付。');
-    // You can integrate a payment gateway (e.g., Stripe) here and update payment_status to 'paid'
+    navigation.navigate('Payment', {
+      orderId: order.order_id,
+      totalAmount: order.total_amount,
+      paymentMethod: order.payment_method,
+    });
   };
 
   const renderOrderItem = ({ item }) => (
@@ -124,32 +122,36 @@ const ViewOrders = ({ navigation }) => {
       <Text style={styles.orderTotal}>总金额: ${item.total_amount}</Text>
       <Text style={styles.orderStatus}>状态: {item.status}</Text>
       <Text style={styles.paymentStatus}>
-        付款状态: {item.payment_status === null ? '未付款' : item.payment_status}
+        付款状态: {item.payment_status === null ? '未付款' : item.payment_status === 'pending_review' ? '待审核' : item.payment_status}
       </Text>
-  
+
       <View style={styles.buttonContainer}>
         <TouchableOpacity
           style={styles.viewButton}
           onPress={() =>
-            navigation.navigate('OrderDetails', { orderId: item.order_id }) // Updated to OrderDetails
+            navigation.navigate('OrderDetails', { orderId: item.order_id })
           }
         >
           <Text style={styles.buttonText}>查看详情</Text>
         </TouchableOpacity>
-  
-        {item.payment_status === null && item.status === 'pending' && (
+
+        {item.status === 'pending' && (
           <>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={() => handleCancelOrder(item.order_id)}
-            >
-              <Text style={styles.buttonText}>取消订单</Text>
-            </TouchableOpacity>
+            {item.payment_status === null && (
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => handleCancelOrder(item.order_id)}
+              >
+                <Text style={styles.buttonText}>取消订单</Text>
+              </TouchableOpacity>
+            )}
             <TouchableOpacity
               style={styles.payButton}
               onPress={() => handlePayOrder(item)}
             >
-              <Text style={styles.buttonText}>立即支付</Text>
+              <Text style={styles.buttonText}>
+                {item.payment_status === null ? '立即支付' : '查看付款情况'}
+              </Text>
             </TouchableOpacity>
           </>
         )}
@@ -198,7 +200,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   orderList: {
-    paddingBottom: 80, // Space for the bottom bar
+    paddingBottom: 80,
   },
   orderCard: {
     backgroundColor: 'white',
