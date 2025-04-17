@@ -8,6 +8,14 @@ import { supabase } from './supabaseClient'; // Adjust your import
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // Hide the default back arrow
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerLeft: () => null,
+    });
+  }, [navigation]);
+
   useEffect(() => {
     const checkLoginStatus = async () => {
 
