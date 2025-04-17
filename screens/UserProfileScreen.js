@@ -12,10 +12,12 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from './supabaseClient';
 import CustBar from './CustBar';
+import AdminBar from './AdminBar';
 
 const UserProfileScreen = ({ navigation }) => {
   const [userInfo, setUserInfo] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   // Hide the default back arrow
   React.useLayoutEffect(() => {
@@ -28,16 +30,21 @@ const UserProfileScreen = ({ navigation }) => {
     const fetchUserData = async () => {
       try {
         const email = await AsyncStorage.getItem('isLoggedIn');
-        
+        if (!email) {
+          navigation.replace('Login');
+          return;
+        }
+
         const { data, error } = await supabase
           .from('users')
-          .select('user_id, username, email, created_at')
+          .select('user_id, username, email, role, created_at')
           .eq('email', email)
           .single();
 
         if (error) throw error;
         if (data) {
           setUserInfo(data);
+          setIsAdmin(data.role === 'admin');
         }
       } catch (error) {
         console.error('Error fetching user data:', error);
@@ -47,7 +54,7 @@ const UserProfileScreen = ({ navigation }) => {
     };
 
     fetchUserData();
-  }, []);
+  }, [navigation]);
 
   const handleLogout = async () => {
     try {
@@ -63,7 +70,11 @@ const UserProfileScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#2CB696" />
-        <CustBar navigation={navigation} activeScreen="UserProfile" />
+        {isAdmin ? (
+          <AdminBar navigation={navigation} activeScreen="SalesHome" />
+        ) : (
+          <CustBar navigation={navigation} activeScreen="UserProfile" />
+        )}
       </SafeAreaView>
     );
   }
@@ -72,7 +83,11 @@ const UserProfileScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <Text style={styles.emptyText}>No user data found.</Text>
-        <CustBar navigation={navigation} activeScreen="UserProfile" />
+        {isAdmin ? (
+          <AdminBar navigation={navigation} activeScreen="SalesHome" />
+        ) : (
+          <CustBar navigation={navigation} activeScreen="UserProfile" />
+        )}
       </SafeAreaView>
     );
   }
@@ -108,31 +123,31 @@ const UserProfileScreen = ({ navigation }) => {
           <View style={styles.iconButtonWrapper}>
             <TouchableOpacity 
               style={styles.iconButton}
-              onPress={() => navigation.navigate('Footprint')}
+              onPress={() => navigation.navigate(isAdmin ? 'SalesHome' : 'Footprint')}
             >
-              <Icon name="history" size={30} color="white" />
+              <Icon name={isAdmin ? 'receipt' : 'history'} size={30} color="white" />
             </TouchableOpacity>
-            <Text style={styles.iconButtonLabel}>足跡</Text>
+            <Text style={styles.iconButtonLabel}>{isAdmin ? '訂單管理' : '足跡'}</Text>
           </View>
 
           <View style={styles.iconButtonWrapper}>
             <TouchableOpacity 
               style={styles.iconButton}
-              onPress={() => navigation.navigate('PurchaseHistory')}
+              onPress={() => navigation.navigate(isAdmin ? 'Inventory' : 'PurchaseHistory')}
             >
-              <Icon name="shopping-cart" size={30} color="white" />
+              <Icon name={isAdmin ? 'archive' : 'shopping-cart'} size={30} color="white" />
             </TouchableOpacity>
-            <Text style={styles.iconButtonLabel}>購買紀錄</Text>
+            <Text style={styles.iconButtonLabel}>{isAdmin ? '庫存' : '購買紀錄'}</Text>
           </View>
 
           <View style={styles.iconButtonWrapper}>
             <TouchableOpacity 
               style={styles.iconButton}
-              onPress={() => navigation.navigate('Preferences')}
+              onPress={() => navigation.navigate(isAdmin ? 'SalesStatus' : 'Preferences')}
             >
-              <Icon name="settings" size={30} color="white" />
+              <Icon name={isAdmin ? 'bar-chart' : 'settings'} size={30} color="white" />
             </TouchableOpacity>
-            <Text style={styles.iconButtonLabel}>喜好設定</Text>
+            <Text style={styles.iconButtonLabel}>{isAdmin ? '銷售狀況' : '喜好設定'}</Text>
           </View>
         </View>
 
@@ -152,7 +167,11 @@ const UserProfileScreen = ({ navigation }) => {
           <Icon name="logout" size={24} color="white" />
         </TouchableOpacity>
       </ScrollView>
-      <CustBar navigation={navigation} activeScreen="UserProfile" />
+      {isAdmin ? (
+        <AdminBar navigation={navigation} activeScreen="SalesHome" />
+      ) : (
+        <CustBar navigation={navigation} activeScreen="UserProfile" />
+      )}
     </SafeAreaView>
   );
 };
@@ -165,7 +184,7 @@ const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     padding: 20,
-    paddingBottom: 80, // Extra padding to avoid overlap with CustBar
+    paddingBottom: 80, // Extra padding to avoid overlap with CustBar or AdminBar
     backgroundColor: '#fff',
   },
   loadingContainer: {

@@ -247,50 +247,47 @@ const ProductDetail = ({ route, navigation }) => {
           ))}
         </View>
       </ScrollView>
+      {/* Quantity Selection Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Select Quantity</Text>
+            <TextInput
+              style={styles.quantityInput}
+              keyboardType="number-pad"
+              value={String(selectedQuantity)}
+              onChangeText={text => {
+                const num = parseInt(text.replace(/[^0-9]/g, ''), 10) || 1;
+                const clamped = Math.max(1, Math.min(product.stock, num));
+                setSelectedQuantity(clamped);
+              }}
+            />
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity 
+                style={styles.confirmButton}
+                onPress={handleAddToCart}
+              >
+                <Text style={styles.buttonText}>Confirm</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.buttonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
       <CustBar navigation={navigation} activeScreen="ProductDetail" />
     </SafeAreaView>
   );
 };
-
-// Quantity Selection Modal
-const ModalContent = ({ modalVisible, setModalVisible, selectedQuantity, setSelectedQuantity, product, handleAddToCart }) => (
-  <Modal
-    animationType="slide"
-    transparent={true}
-    visible={modalVisible}
-    onRequestClose={() => setModalVisible(false)}
-  >
-    <View style={styles.modalContainer}>
-      <View style={styles.modalContent}>
-        <Text style={styles.modalTitle}>Select Quantity</Text>
-        <TextInput
-          style={styles.quantityInput}
-          keyboardType="number-pad"
-          value={String(selectedQuantity)}
-          onChangeText={text => {
-            const num = parseInt(text.replace(/[^0-9]/g, ''), 10) || 1;
-            const clamped = Math.max(1, Math.min(product.stock, num));
-            setSelectedQuantity(clamped);
-          }}
-        />
-        <View style={styles.modalButtonContainer}>
-          <TouchableOpacity 
-            style={styles.confirmButton}
-            onPress={handleAddToCart}
-          >
-            <Text style={styles.buttonText}>Confirm</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.cancelButton}
-            onPress={() => setModalVisible(false)}
-          >
-            <Text style={styles.buttonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  </Modal>
-);
 
 const styles = StyleSheet.create({
   safeArea: {

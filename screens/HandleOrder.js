@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, Alert, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TouchableOpacity, Alert, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView } from 'react-native';
 import { supabase } from './supabaseClient';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import AdminBar from './AdminBar';
 
 const HandleOrder = ({ route, navigation }) => {
   const { orderId } = route.params;
@@ -146,7 +148,7 @@ const HandleOrder = ({ route, navigation }) => {
   const handleShipOrder = async () => {
     Alert.alert(
       '确认发货',
-      '确定要为此订单发货吗？此操作将扣除库存。',
+      '确定要为此订单发货吗？此操作将扣除库存并通知客户。',
       [
         { text: '取消', style: 'cancel' },
         {
@@ -179,29 +181,52 @@ const HandleOrder = ({ route, navigation }) => {
                 return;
               }
 
-              // Deduct stock
+              // Deduct stock using RPC
               for (const item of items) {
-                const { error: updateError } = await supabase
-                  .from('products')
-                  .update({ stock: supabase.rpc('decrement_stock', { product_id: item.product_id, amount: item.quantity }) })
-                  .eq('product_id', item.product_id);
+                const { error: rpcError } = await supabase
+                  .rpc('decrement_stock', { p_product_id: item.product_id, amount: item.quantity });
 
-                if (updateError) throw updateError;
+                if (rpcError) throw rpcError;
               }
 
               // Update order status
-              const { error } = await supabase
+              const { error: orderError } = await supabase
                 .from('orders')
                 .update({ status: 'shipped' })
                 .eq('order_id', orderId);
 
-              if (error) throw error;
+              if (orderError) throw orderError;
 
+              // Send notification message to chat
+              const email = await AsyncStorage.getItem('isLoggedIn');
+              if (!email) throw new Error('Admin not logged in');
+
+              const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('user_id')
+                .eq('email', email)
+                .eq('role', 'admin')
+                .single();
+
+              if (userError || !userData) throw new Error('Admin user not found');
+
+              const { error: messageError } = await supabase
+                .from('order_messages')
+                .insert({
+                  order_id: orderId,
+                  user_id: userData.user_id,
+                  message_text: `您的訂單 #${orderId} 已發貨，請注意查收！`,
+                  is_sales: true,
+                });
+
+              if (messageError) throw messageError;
+
+              // Update state
               setOrder(prev => ({ ...prev, status: 'shipped' }));
-              Alert.alert('成功', '订单已发货，库存已扣除');
+              Alert.alert('成功', '订单已发货，库存已扣除，客户已收到通知');
             } catch (error) {
               console.error('Error shipping order:', error.message || error);
-              Alert.alert('错误', '发货失败');
+              Alert.alert('错误', `发货失败: ${error.message || '请稍后重试'}`);
             }
           },
         },
@@ -211,73 +236,83 @@ const HandleOrder = ({ route, navigation }) => {
 
   if (loading) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2CB696" />
         <Text style={styles.loadingText}>加载中...</Text>
-      </View>
+        <AdminBar navigation={navigation} activeScreen="SalesHome" />
+      </SafeAreaView>
     );
   }
 
   if (!order) {
     return (
-      <View style={styles.loadingContainer}>
+      <SafeAreaView style={styles.loadingContainer}>
         <Text style={styles.loadingText}>订单不存在</Text>
-      </View>
+        <AdminBar navigation={navigation} activeScreen="SalesHome" />
+      </SafeAreaView>
     );
   }
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>订单 #{order.order_id}</Text>
-      <View style={styles.orderCard}>
-        <Text style={styles.detailText}>客户: {order.users.username}</Text>
-        <Text style={styles.detailText}>订单日期: {new Date(order.order_date).toLocaleString('zh-CN')}</Text>
-        <Text style={styles.detailText}>总金额: ${order.total_amount.toFixed(2)}</Text>
-        <Text style={styles.detailText}>订单状态: {statusMap[order.status]}</Text>
-        <Text style={styles.detailText}>付款状态: {paymentStatusMap[order.payment_status] || order.payment_status}</Text>
-      </View>
-
-      <Text style={styles.sectionTitle}>订购商品</Text>
-      {items.map(item => (
-        <View key={item.order_item_id} style={styles.itemCard}>
-          <Text style={styles.itemText}>商品: {item.products.product_name}</Text>
-          <Text style={styles.itemText}>数量: {item.quantity}</Text>
-          <Text style={styles.itemText}>单价: ${item.price.toFixed(2)}</Text>
-          <Text style={styles.itemText}>小计: ${(item.quantity * item.price).toFixed(2)}</Text>
+    <SafeAreaView style={styles.safeArea}>
+      <ScrollView style={styles.container}>
+        <Text style={styles.title}>订单 #{order.order_id}</Text>
+        <View style={styles.orderCard}>
+          <Text style={styles.detailText}>客户: {order.users.username}</Text>
+          <Text style={styles.detailText}>订单日期: {new Date(order.order_date).toLocaleString('zh-CN')}</Text>
+          <Text style={styles.detailText}>总金额: ${order.total_amount.toFixed(2)}</Text>
+          <Text style={styles.detailText}>订单状态: {statusMap[order.status]}</Text>
+          <Text style={styles.detailText}>付款状态: {paymentStatusMap[order.payment_status] || order.payment_status}</Text>
         </View>
-      ))}
 
-      {order.payment_status === 'pending_review' && order.payment_proof_image && (
-        <View style={styles.paymentSection}>
-          <Text style={styles.sectionTitle}>付款证明</Text>
-          <Image source={{ uri: order.payment_proof_image }} style={styles.paymentImage} />
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.approveButton} onPress={handleApprovePayment}>
-              <Text style={styles.buttonText}>批準</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.rejectButton} onPress={handleRejectPayment}>
-              <Text style={styles.buttonText}>拒絕</Text>
-            </TouchableOpacity>
+        <Text style={styles.sectionTitle}>订购商品</Text>
+        {items.map(item => (
+          <View key={item.order_item_id} style={styles.itemCard}>
+            <Text style={styles.itemText}>商品: {item.products.product_name}</Text>
+            <Text style={styles.itemText}>数量: {item.quantity}</Text>
+            <Text style={styles.itemText}>单价: ${item.price.toFixed(2)}</Text>
+            <Text style={styles.itemText}>小计: ${(item.quantity * item.price).toFixed(2)}</Text>
           </View>
-        </View>
-      )}
+        ))}
 
-      {order.payment_status === 'paid' && order.status === 'pending' && (
-        <TouchableOpacity style={styles.shipButton} onPress={handleShipOrder}>
-          <Text style={styles.buttonText}>发货</Text>
+        {order.payment_status === 'pending_review' && order.payment_proof_image && (
+          <View style={styles.paymentSection}>
+            <Text style={styles.sectionTitle}>付款证明</Text>
+            <Image source={{ uri: order.payment_proof_image }} style={styles.paymentImage} />
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity style={styles.approveButton} onPress={handleApprovePayment}>
+                <Text style={styles.buttonText}>批準</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.rejectButton} onPress={handleRejectPayment}>
+                <Text style={styles.buttonText}>拒絕</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {order.payment_status === 'paid' && order.status === 'pending' && (
+          <TouchableOpacity style={styles.shipButton} onPress={handleShipOrder}>
+            <Text style={styles.buttonText}>发货</Text>
+          </TouchableOpacity>
+        )}
+
+        <TouchableOpacity
+          style={styles.chatButton}
+          onPress={() => navigation.navigate('OrderChat', { orderId })}
+        >
+          <Text style={styles.buttonText}>进入聊天室</Text>
         </TouchableOpacity>
-      )}
-
-      <TouchableOpacity
-        style={styles.chatButton}
-        onPress={() => navigation.navigate('OrderChat', { orderId })}
-      >
-        <Text style={styles.buttonText}>进入聊天室</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+      <AdminBar navigation={navigation} activeScreen="SalesHome" />
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+  },
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
@@ -383,6 +418,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f5f5',
   },
   loadingText: {
     fontSize: 18,
