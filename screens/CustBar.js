@@ -1,4 +1,3 @@
-// screens/CustBar.js
 import React from 'react';
 import { View, TouchableOpacity, Text, StyleSheet } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -28,7 +27,7 @@ const CustBar = ({ navigation, activeScreen }) => {
 
       <TouchableOpacity
         style={styles.navButton}
-        onPress={() => navigation.navigate('Messages')} // Placeholder for Messages screen
+        onPress={() => navigation.navigate('Messages')}
       >
         <Icon
           name="envelope"
@@ -66,7 +65,7 @@ const CustBar = ({ navigation, activeScreen }) => {
 
       <TouchableOpacity
         style={styles.navButton}
-        onPress={() => navigation.navigate('ViewOrders')} // Placeholder for ViewOrders screen
+        onPress={() => navigation.navigate('ViewOrders')}
       >
         <MaterialIcons
           name="receipt"
@@ -80,6 +79,25 @@ const CustBar = ({ navigation, activeScreen }) => {
           ]}
         >
           订单
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.navButton}
+        onPress={() => navigation.navigate('UserProfile')}
+      >
+        <Icon
+          name="user"
+          size={24}
+          color={activeScreen === 'UserProfile' ? '#2CB696' : '#666'}
+        />
+        <Text
+          style={[
+            styles.navText,
+            activeScreen === 'UserProfile' && styles.activeText,
+          ]}
+        >
+          個人
         </Text>
       </TouchableOpacity>
     </View>

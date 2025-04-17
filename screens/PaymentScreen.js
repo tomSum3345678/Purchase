@@ -27,14 +27,14 @@ const PaymentScreen = ({ route, navigation }) => {
       try {
         const { data, error } = await supabase
           .from('orders')
-          .select('order_id, total_amount, payment_method, payment_proof_image')
+          .select('order_id, total_amount, payment_method, payment_proof_image, payment_status')
           .eq('order_id', orderId)
           .single();
 
         if (error) throw error;
 
         setOrder(data);
-        if (data.payment_proof_image) {
+        if (data.payment_proof_image || data.payment_status === 'pending_review' || data.payment_status === 'paid') {
           setImage(data.payment_proof_image);
           setUploaded(true);
         }
@@ -223,7 +223,9 @@ const PaymentScreen = ({ route, navigation }) => {
         ) : (
           <View style={styles.postUploadContainer}>
             <Text style={styles.waitingText}>
-              您已上传付款证明，请等待我们审核。
+              {order.payment_status === 'paid'
+                ? '您的付款已确认，请等待发货。'
+                : '您已上传付款证明，请等待我们审核。'}
             </Text>
             <TouchableOpacity
               style={styles.returnButton}

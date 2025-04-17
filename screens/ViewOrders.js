@@ -15,6 +15,27 @@ const ViewOrders = ({ navigation }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Status mappings
+  const statusMap = {
+    pending: '待处理',
+    shipped: '已发货',
+    completed: '已完成',
+    cancelled: '已取消',
+  };
+
+  const paymentStatusMap = {
+    null: '未付款',
+    pending_review: '待审核',
+    paid: '已付款',
+  };
+  
+  // Hide the default back arrow
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+    headerLeft: () => null,
+    });
+  }, [navigation]);
+
   useEffect(() => {
     const fetchOrders = async () => {
       try {
@@ -120,9 +141,9 @@ const ViewOrders = ({ navigation }) => {
         下单时间: {new Date(item.order_date).toLocaleString()}
       </Text>
       <Text style={styles.orderTotal}>总金额: ${item.total_amount}</Text>
-      <Text style={styles.orderStatus}>状态: {item.status}</Text>
+      <Text style={styles.orderStatus}>状态: {statusMap[item.status] || item.status}</Text>
       <Text style={styles.paymentStatus}>
-        付款状态: {item.payment_status === null ? '未付款' : item.payment_status === 'pending_review' ? '待审核' : item.payment_status}
+        付款状态: {paymentStatusMap[item.payment_status] || paymentStatusMap['null']}
       </Text>
 
       <View style={styles.buttonContainer}>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
 import SalesHeader from './SalesHeader';
 import AdminBar from './AdminBar';
-import { supabase } from './supabaseClient'; // Assuming supabaseClient is set up
+import { supabase } from './supabaseClient';
 
 const OrderScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -174,7 +174,10 @@ const OrderScreen = ({ navigation }) => {
       </Text>
       <View style={styles.orderFooter}>
         <Text style={styles.totalText}>总计: ${item.total.toFixed(2)}</Text>
-        <TouchableOpacity style={styles.detailButton}>
+        <TouchableOpacity
+          style={styles.detailButton}
+          onPress={() => navigation.navigate('HandleOrder', { orderId: item.id })}
+        >
           <Text style={styles.detailButtonText}>查看详情</Text>
         </TouchableOpacity>
       </View>
@@ -201,26 +204,19 @@ const OrderScreen = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <SalesHeader />
-      {/* Navigation bar */}
       <View style={styles.navbar}>
         <Text style={styles.navTitle}>訂單管理</Text>
       </View>
-
-      {/* Counts display */}
       <View style={styles.countsContainer}>
         <Text style={styles.countsText}>未付款订单: {counts.unpaid}</Text>
         <Text style={styles.countsText}>待审核订单: {counts.pendingReview}</Text>
       </View>
-
-      {/* Search bar */}
       <TextInput
         style={styles.searchInput}
         placeholder="搜索客户名称..."
         value={searchQuery}
         onChangeText={setSearchQuery}
       />
-
-      {/* Status filters */}
       <View style={styles.filterContainer}>
         {statusFilters.map(filter => (
           <TouchableOpacity
@@ -236,8 +232,6 @@ const OrderScreen = ({ navigation }) => {
           </TouchableOpacity>
         ))}
       </View>
-
-      {/* Order list */}
       <FlatList
         data={orders}
         renderItem={renderOrderItem}
@@ -252,7 +246,6 @@ const OrderScreen = ({ navigation }) => {
         onEndReachedThreshold={0.2}
         contentContainerStyle={styles.listContent}
       />
-
       <AdminBar navigation={navigation} activeScreen="SalesHome" />
     </View>
   );
@@ -317,7 +310,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingHorizontal: 16,
-    paddingBottom: 80, // Avoid overlap with AdminBar
+    paddingBottom: 80,
   },
   orderCard: {
     backgroundColor: 'white',

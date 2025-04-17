@@ -18,6 +18,8 @@ import Messages from './screens/Messages';
 import OrderChat from './screens/OrderChat';
 import StockScreen from './screens/StockScreen';
 import PaymentScreen from './screens/PaymentScreen';
+import HandleOrder from './screens/HandleOrder';
+import Footprint from './screens/Footprint';
 
 const Stack = createStackNavigator();
 
@@ -42,6 +44,8 @@ const App = () => {
           <Stack.Screen name="OrderChat" component={OrderChat} />
           <Stack.Screen name="Inventory" component={StockScreen} />
           <Stack.Screen name="Payment" component={PaymentScreen} />
+          <Stack.Screen name="HandleOrder" component={HandleOrder} />
+          <Stack.Screen name="Footprint" component={Footprint} />
           {/* Add other screens here */}
         </Stack.Navigator>
       </SafeAreaView>
