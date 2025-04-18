@@ -16,6 +16,14 @@ const Messages = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [userRole, setUserRole] = useState(null);
 
+  // Status mappings for Chinese UI
+  const statusMapping = {
+    pending: '待处理',
+    processing: '处理中',
+    completed: '已完成',
+    canceled: '已取消',
+  };
+
   useEffect(() => {
     const fetchOrdersWithMessages = async () => {
       try {
@@ -97,7 +105,7 @@ const Messages = ({ navigation }) => {
     >
       <Text style={styles.orderId}>订单编号: #{item.order_id}</Text>
       <Text style={styles.orderTotal}>总金额: ${item.total_amount}</Text>
-      <Text style={styles.orderStatus}>状态: {item.status}</Text>
+      <Text style={styles.orderStatus}>状态: {statusMapping[item.status] || item.status}</Text>
       {item.latestMessage && (
         <Text style={styles.messagePreview}>
           {item.isSalesMessage ? '销售' : '客户'}: {item.latestMessage.slice(0, 30)}...

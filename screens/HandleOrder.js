@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Image, TouchableOpacity, Alert, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView } from 'react-native';
+import { View, Text, Image, TouchableOpacity, Alert, StyleSheet, ScrollView, ActivityIndicator, SafeAreaView, TextInput, Modal } from 'react-native';
 import { supabase } from './supabaseClient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AdminBar from './AdminBar';
@@ -9,6 +9,8 @@ const HandleOrder = ({ route, navigation }) => {
   const [order, setOrder] = useState(null);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [newLocation, setNewLocation] = useState('');
 
   // Status mappings
   const paymentStatusMap = {
@@ -24,11 +26,15 @@ const HandleOrder = ({ route, navigation }) => {
     cancelled: '已取消',
   };
 
+  const deliveryStatusMap = {
+    null: '未发货',
+    delivered: '已送达客户所指定的地址',
+  };
+
   // Fetch order details and items
   useEffect(() => {
     const fetchOrderDetails = async () => {
       try {
-        // Fetch order data
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
           .select(`
@@ -39,6 +45,12 @@ const HandleOrder = ({ route, navigation }) => {
             payment_status,
             payment_proof_image,
             user_id,
+            delivery_address_line1,
+            delivery_address_line2,
+            delivery_street,
+            delivery_district,
+            delivery_country,
+            delivery_status_current_location,
             users!inner(username)
           `)
           .eq('order_id', orderId)
@@ -46,7 +58,6 @@ const HandleOrder = ({ route, navigation }) => {
 
         if (orderError) throw orderError;
 
-        // Fetch order items
         const { data: itemsData, error: itemsError } = await supabase
           .from('order_items')
           .select(`
@@ -114,7 +125,6 @@ const HandleOrder = ({ route, navigation }) => {
           text: '确定',
           onPress: async () => {
             try {
-              // Delete payment proof image from storage
               if (order.payment_proof_image) {
                 const fileName = order.payment_proof_image.split('/').pop();
                 const { error: storageError } = await supabase.storage
@@ -124,7 +134,6 @@ const HandleOrder = ({ route, navigation }) => {
                 if (storageError) throw storageError;
               }
 
-              // Update order
               const { error } = await supabase
                 .from('orders')
                 .update({ payment_status: null, payment_proof_image: null })
@@ -155,7 +164,6 @@ const HandleOrder = ({ route, navigation }) => {
           text: '确定',
           onPress: async () => {
             try {
-              // Fetch current stock
               const productIds = items.map(item => item.product_id);
               const { data: productsData, error: productsError } = await supabase
                 .from('products')
@@ -164,7 +172,6 @@ const HandleOrder = ({ route, navigation }) => {
 
               if (productsError) throw productsError;
 
-              // Check inventory
               let insufficientStock = [];
               for (const item of items) {
                 const product = productsData.find(p => p.product_id === item.product_id);
@@ -181,7 +188,6 @@ const HandleOrder = ({ route, navigation }) => {
                 return;
               }
 
-              // Deduct stock using RPC
               for (const item of items) {
                 const { error: rpcError } = await supabase
                   .rpc('decrement_stock', { p_product_id: item.product_id, amount: item.quantity });
@@ -189,7 +195,6 @@ const HandleOrder = ({ route, navigation }) => {
                 if (rpcError) throw rpcError;
               }
 
-              // Update order status
               const { error: orderError } = await supabase
                 .from('orders')
                 .update({ status: 'shipped' })
@@ -197,7 +202,6 @@ const HandleOrder = ({ route, navigation }) => {
 
               if (orderError) throw orderError;
 
-              // Send notification message to chat
               const email = await AsyncStorage.getItem('isLoggedIn');
               if (!email) throw new Error('Admin not logged in');
 
@@ -215,13 +219,12 @@ const HandleOrder = ({ route, navigation }) => {
                 .insert({
                   order_id: orderId,
                   user_id: userData.user_id,
-                  message_text: `您的訂單 #${orderId} 已發貨，請注意查收！`,
+                  message_text: `您的订单 #${orderId} 已发货，请注意查收！`,
                   is_sales: true,
                 });
 
               if (messageError) throw messageError;
 
-              // Update state
               setOrder(prev => ({ ...prev, status: 'shipped' }));
               Alert.alert('成功', '订单已发货，库存已扣除，客户已收到通知');
             } catch (error) {
@@ -232,6 +235,130 @@ const HandleOrder = ({ route, navigation }) => {
         },
       ]
     );
+  };
+
+  // Update delivery location
+  const handleUpdateLocation = async () => {
+    if (!newLocation.trim()) {
+      Alert.alert('错误', '请输入物流位置');
+      return;
+    }
+
+    try {
+      const email = await AsyncStorage.getItem('isLoggedIn');
+      if (!email) throw new Error('Admin not logged in');
+
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('user_id')
+        .eq('email', email)
+        .eq('role', 'admin')
+        .single();
+
+      if (userError || !userData) throw new Error('Admin user not found');
+
+      // Update location in orders table
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ delivery_status_current_location: newLocation.trim() })
+        .eq('order_id', orderId);
+
+      if (updateError) throw updateError;
+
+      // Send notification to chat
+      const { error: messageError } = await supabase
+        .from('order_messages')
+        .insert({
+          order_id: orderId,
+          user_id: userData.user_id,
+          message_text: `您的訂單 #${orderId} 物流位置已更新：${newLocation.trim()}`,
+          is_sales: true,
+        });
+
+      if (messageError) throw messageError;
+
+      setOrder(prev => ({ ...prev, delivery_status_current_location: newLocation.trim() }));
+      setNewLocation('');
+      setShowLocationModal(false);
+      Alert.alert('成功', '物流位置已更新，客户已收到通知');
+    } catch (error) {
+      console.error('Error updating location:', error.message || error);
+      Alert.alert('错误', '更新物流位置失败');
+    }
+  };
+
+  // Mark as delivered
+  const handleMarkAsDelivered = async () => {
+    Alert.alert(
+      '確認送達',
+      '確定要將此訂單標記為已送達嗎？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '確定',
+          onPress: async () => {
+            try {
+              const email = await AsyncStorage.getItem('isLoggedIn');
+              if (!email) throw new Error('Admin not logged in');
+
+              const { data: userData, error: userError } = await supabase
+                .from('users')
+                .select('user_id')
+                .eq('email', email)
+                .eq('role', 'admin')
+                .single();
+
+              if (userError || !userData) throw new Error('Admin user not found');
+
+              // Update to delivered status
+              const { error: updateError } = await supabase
+                .from('orders')
+                .update({ delivery_status_current_location: 'delivered' })
+                .eq('order_id', orderId);
+
+              if (updateError) throw updateError;
+
+              // Send notification to chat
+              const { error: messageError } = await supabase
+                .from('order_messages')
+                .insert({
+                  order_id: orderId,
+                  user_id: userData.user_id,
+                  message_text: `您的订单 #${orderId} 已送达指定地址，请确认收货！`,
+                  is_sales: true,
+                });
+
+              if (messageError) throw messageError;
+
+              setOrder(prev => ({ ...prev, delivery_status_current_location: 'delivered' }));
+              setShowLocationModal(false);
+              Alert.alert('成功', '訂單已標記為已送達，客戶已收到通知');
+            } catch (error) {
+              console.error('Error marking as delivered:', error.message || error);
+              Alert.alert('錯誤', '標記送達失敗');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Check if current location matches delivery address
+  const isAtDeliveryAddress = () => {
+    if (!order || !newLocation) return false;
+    const deliveryAddress = formatDeliveryAddress();
+    return newLocation.trim().toLowerCase() === deliveryAddress.toLowerCase();
+  };
+
+  // Format delivery address for display
+  const formatDeliveryAddress = () => {
+    if (!order) return '無送貨地址';
+    const { delivery_address_line1, delivery_address_line2, delivery_street, delivery_district, delivery_country } = order;
+    let address = `${delivery_address_line1}, ${delivery_street}, ${delivery_district}, ${delivery_country}`;
+    if (delivery_address_line2) {
+      address = `${delivery_address_line1}, ${delivery_address_line2}, ${delivery_street}, ${delivery_district}, ${delivery_country}`;
+    }
+    return address;
   };
 
   if (loading) {
@@ -263,6 +390,10 @@ const HandleOrder = ({ route, navigation }) => {
           <Text style={styles.detailText}>总金额: ${order.total_amount.toFixed(2)}</Text>
           <Text style={styles.detailText}>订单状态: {statusMap[order.status]}</Text>
           <Text style={styles.detailText}>付款状态: {paymentStatusMap[order.payment_status] || order.payment_status}</Text>
+          <Text style={styles.detailText}>送貨地址: {formatDeliveryAddress()}</Text>
+          <Text style={styles.detailText}>
+            当前物流位置: {deliveryStatusMap[order.delivery_status_current_location] || order.delivery_status_current_location || '未更新'}
+          </Text>
         </View>
 
         <Text style={styles.sectionTitle}>订购商品</Text>
@@ -296,6 +427,15 @@ const HandleOrder = ({ route, navigation }) => {
           </TouchableOpacity>
         )}
 
+        {order.status === 'shipped' && order.delivery_status_current_location !== 'delivered' && (
+          <TouchableOpacity
+            style={styles.updateLocationButton}
+            onPress={() => setShowLocationModal(true)}
+          >
+            <Text style={styles.buttonText}>更新物流位置</Text>
+          </TouchableOpacity>
+        )}
+
         <TouchableOpacity
           style={styles.chatButton}
           onPress={() => navigation.navigate('OrderChat', { orderId })}
@@ -303,6 +443,41 @@ const HandleOrder = ({ route, navigation }) => {
           <Text style={styles.buttonText}>进入聊天室</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Modal for updating location */}
+      <Modal visible={showLocationModal} animationType="slide" transparent>
+        <View style={styles.modalContainer}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>更新物流位置</Text>
+            <TextInput
+              style={styles.modalInput}
+              value={newLocation}
+              onChangeText={setNewLocation}
+              placeholder="请输入当前物流位置"
+            />
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity
+                style={styles.modalButton}
+                onPress={() => {
+                  setNewLocation('');
+                  setShowLocationModal(false);
+                }}
+              >
+                <Text style={styles.buttonText}>取消</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.modalButton} onPress={handleUpdateLocation}>
+                <Text style={styles.buttonText}>确认更新</Text>
+              </TouchableOpacity>
+              {isAtDeliveryAddress() && (
+                <TouchableOpacity style={styles.markDeliveredButton} onPress={handleMarkAsDelivered}>
+                  <Text style={styles.buttonText}>標記為已送達</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
+
       <AdminBar navigation={navigation} activeScreen="SalesHome" />
     </SafeAreaView>
   );
@@ -400,6 +575,14 @@ const styles = StyleSheet.create({
     marginVertical: 16,
     alignItems: 'center',
   },
+  updateLocationButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginVertical: 16,
+    alignItems: 'center',
+  },
   chatButton: {
     backgroundColor: '#1E90FF',
     paddingVertical: 12,
@@ -423,6 +606,54 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 18,
     color: '#666',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 8,
+    width: '80%',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 16,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 8,
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+  },
+  modalButton: {
+    backgroundColor: '#2CB696',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginVertical: 8,
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  markDeliveredButton: {
+    backgroundColor: '#FF9800',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    marginVertical: 8,
+    flex: 1,
+    marginHorizontal: 4,
   },
 });
 

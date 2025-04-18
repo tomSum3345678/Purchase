@@ -1,4 +1,3 @@
-// screens/OrderChat.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, FlatList, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
@@ -112,6 +111,12 @@ const OrderChat = ({ navigation, route }) => {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>订单 #{orderId} 聊天室</Text>
+      <TouchableOpacity
+        style={styles.orderDetailsButton}
+        onPress={() => navigation.navigate('OrderDetails', { orderId })}
+      >
+        <Text style={styles.buttonText}>查看该订单详情</Text>
+      </TouchableOpacity>
       <FlatList
         data={messages}
         renderItem={renderMessage}
@@ -144,7 +149,21 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 8,
+  },
+  orderDetailsButton: {
+    backgroundColor: '#2CB696',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignSelf: 'center',
     marginBottom: 16,
+  },
+  buttonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '500',
+    textAlign: 'center',
   },
   messageList: {
     paddingBottom: 80, // Space for input area

@@ -6,7 +6,6 @@ import {
   Image, 
   TouchableOpacity, 
   StyleSheet, 
-  TextInput, 
   Modal,
   Alert,
   SafeAreaView,
@@ -102,7 +101,7 @@ const ProductDetail = ({ route, navigation }) => {
   const handleAddToCart = async () => {
     // Validation checks
     if (typeof selectedQuantity !== 'number' || selectedQuantity < 1) {
-      Alert.alert('錯誤', '請輸入有效的商品數量');
+      Alert.alert('錯誤', '請選擇有效的商品數量');
       return;
     }
 
@@ -194,6 +193,20 @@ const ProductDetail = ({ route, navigation }) => {
     }
   };
 
+  // Increment quantity
+  const incrementQuantity = () => {
+    if (selectedQuantity < product.stock) {
+      setSelectedQuantity(prev => prev + 1);
+    }
+  };
+
+  // Decrement quantity
+  const decrementQuantity = () => {
+    if (selectedQuantity > 1) {
+      setSelectedQuantity(prev => prev - 1);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -256,29 +269,36 @@ const ProductDetail = ({ route, navigation }) => {
       >
         <View style={styles.modalContainer}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Quantity</Text>
-            <TextInput
-              style={styles.quantityInput}
-              keyboardType="number-pad"
-              value={String(selectedQuantity)}
-              onChangeText={text => {
-                const num = parseInt(text.replace(/[^0-9]/g, ''), 10) || 1;
-                const clamped = Math.max(1, Math.min(product.stock, num));
-                setSelectedQuantity(clamped);
-              }}
-            />
+            <Text style={styles.modalTitle}>選擇數量</Text>
+            <View style={styles.quantitySelector}>
+              <TouchableOpacity 
+                style={styles.quantityButton}
+                onPress={decrementQuantity}
+                disabled={selectedQuantity <= 1}
+              >
+                <Text style={styles.quantityButtonText}>-</Text>
+              </TouchableOpacity>
+              <Text style={styles.quantityText}>{selectedQuantity}</Text>
+              <TouchableOpacity 
+                style={styles.quantityButton}
+                onPress={incrementQuantity}
+                disabled={selectedQuantity >= product.stock}
+              >
+                <Text style={styles.quantityButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity 
                 style={styles.confirmButton}
                 onPress={handleAddToCart}
               >
-                <Text style={styles.buttonText}>Confirm</Text>
+                <Text style={styles.buttonText}>確認</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={styles.cancelButton}
                 onPress={() => setModalVisible(false)}
               >
-                <Text style={styles.buttonText}>Cancel</Text>
+                <Text style={styles.buttonText}>取消</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -379,14 +399,34 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 10,
-  },
-  quantityInput: {
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    padding: 10,
     marginBottom: 20,
+    textAlign: 'center',
+  },
+  quantitySelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  quantityButton: {
+    backgroundColor: '#2CB696',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 10,
+  },
+  quantityButtonText: {
+    color: 'white',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  quantityText: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    width: 50,
     textAlign: 'center',
   },
   modalButtonContainer: {
@@ -398,12 +438,16 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     paddingVertical: 10,
     paddingHorizontal: 20,
+    flex: 1,
+    marginRight: 10,
   },
   cancelButton: {
     backgroundColor: '#ff4d4d',
     borderRadius: 5,
     paddingVertical: 10,
     paddingHorizontal: 20,
+    flex: 1,
+    marginLeft: 10,
   },
   commentsSection: {
     padding: 20,

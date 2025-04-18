@@ -6,7 +6,7 @@ import {
   StyleSheet,
   Alert,
   View,
-  Image, // Added Image component
+  Image,
 } from 'react-native';
 import { createClient } from '@supabase/supabase-js';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,6 +20,25 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const OrderDetails = ({ navigation, route }) => {
   const [orderDetails, setOrderDetails] = useState(null);
   const [loading, setLoading] = useState(true);
+
+  // Status mappings for Chinese UI
+  const paymentStatusMap = {
+    null: '未付款',
+    pending_review: '待审核',
+    paid: '已付款',
+  };
+
+  const orderStatusMap = {
+    pending: '待处理',
+    shipped: '已发货',
+    completed: '已完成',
+    cancelled: '已取消',
+  };
+
+  const deliveryStatusMap = {
+    null: '未发货', // Default for non-shipped orders
+    delivered: '已送达您所指定的地址', // Map 'delivered' to Chinese
+  };
 
   useEffect(() => {
     const fetchOrderDetails = async () => {
@@ -61,7 +80,7 @@ const OrderDetails = ({ navigation, route }) => {
         // Fetch order items with product details including image_data
         const { data: itemsData, error: itemsError } = await supabase
           .from('order_items')
-          .select('product_id, quantity, price, products(product_name, image_data)') // Added image_data
+          .select('product_id, quantity, price, products(product_name, image_data)')
           .eq('order_id', orderId);
 
         if (itemsError) throw itemsError;
@@ -71,7 +90,7 @@ const OrderDetails = ({ navigation, route }) => {
           product_name: item.products.product_name,
           quantity: item.quantity,
           price: item.price,
-          image_data: item.products.image_data, // Added image_data
+          image_data: item.products.image_data,
         }));
 
         setOrderDetails({
@@ -102,9 +121,18 @@ const OrderDetails = ({ navigation, route }) => {
     fetchOrderDetails();
   }, [navigation, route]);
 
+  // Function to get display text for delivery status
+  const getDeliveryStatusText = () => {
+    // If order is shipped but no location is set, show "已出仓"
+    if (orderDetails.status === 'shipped' && orderDetails.deliveryStatus === null) {
+      return '已出仓';
+    }
+    // Map 'delivered' to Chinese, or show the actual location if it's a custom value
+    return deliveryStatusMap[orderDetails.deliveryStatus] || orderDetails.deliveryStatus || '未发货';
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.itemCard}>
-      {/* Added Image component */}
       <Image
         source={{ uri: item.image_data }}
         style={styles.itemImage}
@@ -162,20 +190,20 @@ const OrderDetails = ({ navigation, route }) => {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>付款状态</Text>
             <Text style={styles.detailText}>
-              {orderDetails.paymentStatus === null ? '未付款' : orderDetails.paymentStatus}
+              {paymentStatusMap[orderDetails.paymentStatus] || orderDetails.paymentStatus}
             </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>订单状态</Text>
-            <Text style={styles.detailText}>{orderDetails.status}</Text>
+            <Text style={styles.detailText}>
+              {orderStatusMap[orderDetails.status] || orderDetails.status}
+            </Text>
           </View>
 
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>配送状态</Text>
-            <Text style={styles.detailText}>
-              {orderDetails.deliveryStatus === null ? '未发货' : orderDetails.deliveryStatus}
-            </Text>
+            <Text style={styles.detailText}>{getDeliveryStatusText()}</Text>
           </View>
 
           <View style={styles.section}>
@@ -246,14 +274,14 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   itemCard: {
-    flexDirection: 'row', // Align image and text horizontally
+    flexDirection: 'row',
     padding: 8,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
     alignItems: 'center',
   },
   itemImage: {
-    width: 60, // Adjust size as needed
+    width: 60,
     height: 60,
     borderRadius: 8,
     marginRight: 10,

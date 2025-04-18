@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { View, TextInput, Button, Alert, StyleSheet, ImageBackground, Platform, Dimensions, TouchableOpacity, Text } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { supabase } from './supabaseClient'; // Adjust your import
+import { supabase } from './supabaseClient';
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
@@ -51,7 +51,7 @@ const LoginScreen = ({ navigation }) => {
       .from('users')
       .select('*')
       .eq('email', email)
-      .eq('password', password) // Assuming password is stored in plain text
+      .eq('password', password) 
       .single();
 
     if (error || !data) {

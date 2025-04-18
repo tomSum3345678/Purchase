@@ -28,11 +28,11 @@ const ViewOrders = ({ navigation }) => {
     pending_review: '待审核',
     paid: '已付款',
   };
-  
+
   // Hide the default back arrow
   React.useLayoutEffect(() => {
     navigation.setOptions({
-    headerLeft: () => null,
+      headerLeft: () => null,
     });
   }, [navigation]);
 
@@ -61,6 +61,7 @@ const ViewOrders = ({ navigation }) => {
           .from('orders')
           .select('*')
           .eq('user_id', userId)
+          .neq('status', 'completed') // Exclude completed orders
           .order('order_date', { ascending: false });
 
         if (ordersError) throw ordersError;
@@ -109,7 +110,7 @@ const ViewOrders = ({ navigation }) => {
             try {
               const { error } = await supabase
                 .from('orders')
-                .delete()
+                .update({ status: 'cancelled' })
                 .eq('order_id', orderId);
 
               if (error) throw error;
@@ -119,6 +120,59 @@ const ViewOrders = ({ navigation }) => {
             } catch (error) {
               console.error('Error canceling order:', error.message || error);
               Alert.alert('错误', '取消订单失败');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleConfirmReceipt = async (orderId) => {
+    Alert.alert(
+      '確認收貨',
+      '您確認已收到貨物嗎？',
+      [
+        { text: '取消', style: 'cancel' },
+        {
+          text: '確定',
+          onPress: async () => {
+            try {
+              // Update order status to completed
+              const { error: updateError } = await supabase
+                .from('orders')
+                .update({ status: 'completed' })
+                .eq('order_id', orderId);
+
+              if (updateError) throw updateError;
+
+              // Fetch admin user for sending message
+              const { data: adminData, error: adminError } = await supabase
+                .from('users')
+                .select('user_id')
+                .eq('role', 'admin')
+                .limit(1)
+                .single();
+
+              if (adminError || !adminData) throw new Error('Admin user not found');
+
+              // Send message in chat
+              const { error: messageError } = await supabase
+                .from('order_messages')
+                .insert({
+                  order_id: orderId,
+                  user_id: adminData.user_id,
+                  message_text: `感謝您的購買！訂單 #${orderId} 已完成，您現在可以為購買的書籍留言評分！`,
+                  is_sales: true,
+                });
+
+              if (messageError) throw messageError;
+
+              // Remove order from the list
+              setOrders(orders.filter((order) => order.order_id !== orderId));
+              Alert.alert('感謝光顧', '訂單已確認完成，感謝您的購買！');
+            } catch (error) {
+              console.error('Error confirming receipt:', error.message || error);
+              Alert.alert('錯誤', '確認收貨失敗');
             }
           },
         },
@@ -175,6 +229,15 @@ const ViewOrders = ({ navigation }) => {
               </Text>
             </TouchableOpacity>
           </>
+        )}
+
+        {item.status === 'shipped' && item.delivery_status_current_location === 'delivered' && (
+          <TouchableOpacity
+            style={styles.confirmReceiptButton}
+            onPress={() => handleConfirmReceipt(item.order_id)}
+          >
+            <Text style={styles.buttonText}>確認收貨</Text>
+          </TouchableOpacity>
         )}
       </View>
     </View>
@@ -279,6 +342,12 @@ const styles = StyleSheet.create({
   },
   payButton: {
     backgroundColor: '#FFA500',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+  },
+  confirmReceiptButton: {
+    backgroundColor: '#4CAF50',
     paddingVertical: 8,
     paddingHorizontal: 16,
     borderRadius: 8,
