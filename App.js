@@ -20,6 +20,13 @@ import StockScreen from './screens/StockScreen';
 import PaymentScreen from './screens/PaymentScreen';
 import HandleOrder from './screens/HandleOrder';
 import Footprint from './screens/Footprint';
+import CommentForm from './screens/CommentForm';
+import PurchaseHistory from './screens/PurchaseHistory';
+import Preferences from './screens/Preferences';
+import SalesStatus from './screens/SalesStatus';
+import ProductInfo from './screens/ProductInfo';
+import UserManagement from './screens/UserManagement';
+import CustomerInfo from './screens/CustomerInfo';
 
 const Stack = createStackNavigator();
 
@@ -46,6 +53,13 @@ const App = () => {
           <Stack.Screen name="Payment" component={PaymentScreen} />
           <Stack.Screen name="HandleOrder" component={HandleOrder} />
           <Stack.Screen name="Footprint" component={Footprint} />
+          <Stack.Screen name="CommentForm" component={CommentForm} />
+          <Stack.Screen name="PurchaseHistory" component={PurchaseHistory} />
+          <Stack.Screen name="Preferences" component={Preferences} />
+          <Stack.Screen name="SalesStatus" component={SalesStatus} />
+          <Stack.Screen name="ProductInfo" component={ProductInfo} />
+          <Stack.Screen name="UserManagement" component={UserManagement} />
+          <Stack.Screen name="CustomerInfo" component={CustomerInfo} />
           {/* Add other screens here */}
         </Stack.Navigator>
       </SafeAreaView>

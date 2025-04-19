@@ -147,7 +147,7 @@ const UserProfileScreen = ({ navigation }) => {
             >
               <Icon name={isAdmin ? 'bar-chart' : 'settings'} size={30} color="white" />
             </TouchableOpacity>
-            <Text style={styles.iconButtonLabel}>{isAdmin ? '銷售狀況' : '喜好設定'}</Text>
+            <Text style={styles.iconButtonLabel}>{isAdmin ? '銷售狀況' : '偏好管理'}</Text>
           </View>
         </View>
 

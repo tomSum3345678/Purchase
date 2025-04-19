@@ -233,6 +233,8 @@ const AddProduct = ({ navigation }) => {
           placeholderTextColor="#999"
         />
 
+        <Text style={{ marginBottom: 8, color: '#555' }}>(分類ID: 1=武俠, 2=烹飪, 3=編程, 4=歷史, 5=自傳)</Text>
+
         <TouchableOpacity
           style={[styles.button, uploading && styles.buttonDisabled]}
           onPress={pickImage}

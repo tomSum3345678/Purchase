@@ -36,8 +36,8 @@ const OrderDetails = ({ navigation, route }) => {
   };
 
   const deliveryStatusMap = {
-    null: '未发货', // Default for non-shipped orders
-    delivered: '已送达您所指定的地址', // Map 'delivered' to Chinese
+    null: '未发货',
+    delivered: '已送达所指定的地址',
   };
 
   useEffect(() => {
@@ -55,9 +55,10 @@ const OrderDetails = ({ navigation, route }) => {
           return;
         }
 
+        // Fetch user data including role
         const { data: userData, error: userError } = await supabase
           .from('users')
-          .select('user_id')
+          .select('user_id, role')
           .eq('email', email)
           .single();
 
@@ -65,13 +66,20 @@ const OrderDetails = ({ navigation, route }) => {
           throw new Error(userError?.message || 'User not found');
         }
         const userId = userData.user_id;
+        const userRole = userData.role;
 
-        const { data: orderData, error: orderError } = await supabase
+        // Build order query based on user role
+        let orderQuery = supabase
           .from('orders')
           .select('*')
-          .eq('order_id', orderId)
-          .eq('user_id', userId)
-          .single();
+          .eq('order_id', orderId);
+
+        // For non-admin users, restrict to their own orders
+        if (userRole !== 'admin') {
+          orderQuery = orderQuery.eq('user_id', userId);
+        }
+
+        const { data: orderData, error: orderError } = await orderQuery.single();
 
         if (orderError || !orderData) {
           throw new Error(orderError?.message || 'Order not found');
@@ -123,11 +131,9 @@ const OrderDetails = ({ navigation, route }) => {
 
   // Function to get display text for delivery status
   const getDeliveryStatusText = () => {
-    // If order is shipped but no location is set, show "已出仓"
     if (orderDetails.status === 'shipped' && orderDetails.deliveryStatus === null) {
       return '已出仓';
     }
-    // Map 'delivered' to Chinese, or show the actual location if it's a custom value
     return deliveryStatusMap[orderDetails.deliveryStatus] || orderDetails.deliveryStatus || '未发货';
   };
 

@@ -78,7 +78,7 @@ const AdminBar = ({ navigation, activeScreen }) => {
             activeScreen === 'UserManagement' && styles.activeText,
           ]}
         >
-          用戶管理
+          客戶管理
         </Text>
       </TouchableOpacity>
     </View>
