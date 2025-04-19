@@ -27,6 +27,7 @@ import SalesStatus from './screens/SalesStatus';
 import ProductInfo from './screens/ProductInfo';
 import UserManagement from './screens/UserManagement';
 import CustomerInfo from './screens/CustomerInfo';
+import RegisterForm from './screens/RegisterForm';
 
 const Stack = createStackNavigator();
 
@@ -60,6 +61,7 @@ const App = () => {
           <Stack.Screen name="ProductInfo" component={ProductInfo} />
           <Stack.Screen name="UserManagement" component={UserManagement} />
           <Stack.Screen name="CustomerInfo" component={CustomerInfo} />
+          <Stack.Screen name="RegisterForm" component={RegisterForm} />
           {/* Add other screens here */}
         </Stack.Navigator>
       </SafeAreaView>
