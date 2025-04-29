@@ -537,6 +537,6 @@ Once the app is running, test the following features locally:
 
 ## Next Steps
 
-After setting up the project, you can start exploring the app’s features locally. Use the Expo Go app or an emulator to test user registration, product browsing, checkout, and chat functionalities. Since this is a student project, focus on learning and experimenting with the code rather than deploying to production.
+After setting up the project, you can start exploring the app’s features locally. Use the Expo Go app or an emulator to test user registration, product browsing, checkout, and chat functionalities.
 
 If you have any issues, refer to the troubleshooting section or check the official documentation for Expo, React Native, and Supabase.
