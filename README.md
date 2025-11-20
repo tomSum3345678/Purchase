@@ -1,6 +1,6 @@
 # Installation Guide for this Project
 
-This guide provides step-by-step instructions to set up and run the SSW BookHub e-book store project locally. The project is a React Native mobile app built with Expo and uses Supabase for backend services (database and storage). Follow these steps to get the app running on your local machine.
+This guide provides step-by-step instructions to set up and run this project locally. The project is a React Native mobile app built with Expo and uses Supabase for backend services (database and storage). Follow these steps to get the app running on your local machine.
 
 ---
 
